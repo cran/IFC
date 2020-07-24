@@ -58,9 +58,12 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
                      color_mode = c("white","black")[1], add_key = "panel", precision = c("light","full")[1],
                      trunc_labels = 38, trans = asinh, bin, viewport = "ideas", ...) {
   dots = list(...)
-  # backup last state of device ask newpage and set to FALSE
-  old_ask <- devAskNewPage(ask = FALSE)
-  on.exit(devAskNewPage(ask = old_ask), add = TRUE)
+  dv <- dev.cur()
+  # backup last state of graphic device
+  tryCatch({
+  # old_ask <- devAskNewPage(ask = FALSE)
+  # on.exit(devAskNewPage(ask = old_ask), add = TRUE)
+
   # change locale
   locale_back = Sys.getlocale("LC_ALL")
   on.exit(suppressWarnings(Sys.setlocale("LC_ALL", locale = locale_back)), add = TRUE)
@@ -82,6 +85,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
   if(!all(typeof(trans) == "builtin") && (class(trans) == "function")) stop("'trans' should be a function")
   
   # shortcuts
+  normalize = FALSE
   P = obj$pops
   R = obj$regions
   g = do.call(what=buildGraph, args=graph)
@@ -118,6 +122,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
     trans_x = as.numeric(g$xlogrange)
     D[,"x2"] = smoothLinLog(D[,"x1"], hyper=trans_x, base=10)
     Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
+    Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
   } else {
     D[,"x2"] = D[,"x1"]
   }
@@ -152,6 +157,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
   displayed_o = c(base_o, shown_o)
   D = cbind(D, displayed_d)
   D = D[sub, ]
+
   if(g$type=="histogram") {
     KEY = list("text"=list(displayed_n),
                "lines"=list(col = sapply(displayed_n, FUN=function(p) P[[p]][c("color","lightModeColor")][[color_mode]]),
@@ -183,7 +189,6 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
     }))
     colnames(stats) = c(colnames(stats)[1:2], paste0("x-",colnames(stats)[3:8]))
     
-    normalize = FALSE
     smooth = (g$histogramsmoothingfactor != 0)
     # br = do.breaks(range(D[,"x2"], na.rm = TRUE, finite = TRUE), nbin)
     if(viewport == "ideas") {
@@ -220,7 +225,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
         Ylim = c(0,max(sapply(displayed_n, FUN=function(x) get_ylim(x=D[D[,x],"x2"], type=type, br=br))*1.07))
         if(Ylim[1] == Ylim[2]) Ylim = Ylim[1] + c(0,0.07)
       } 
-      foo = histogram(~ D[,"x2"], auto.key=FALSE, xlim = Xlim, ylim = Ylim, main =  trunc_string(g$title, trunc_labels),
+      foo = histogram(~ D[,"x2"], auto.key=FALSE, xlim = Xlim, ylim = Ylim, main = trunc_string(g$title, trunc_labels),
                       scales =  myScales(x=list("hyper"=trans_x)), border = "transparent",
                       xlab =  trunc_string(g$xlabel, trunc_labels), ylab = g$ylabel,
                       nint = nbin, type = type, breaks = br, normalize = normalize,
@@ -355,7 +360,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
 
     foo = xyplot(D[,"y2"] ~ D[,"x2"], auto.key=FALSE, xlim = Xlim, ylim = Ylim, main = trunc_string(g$title, trunc_labels), groups=groups,
                  scales =  myScales(x=list(hyper=trans_x), y=list(hyper=trans_y)),
-                 xlab =  trunc_string(g$xlabel, trunc_labels), ylab =  trunc_string(g$ylabel, trunc_labels),
+                 xlab =  trunc_string(g$xlabel, trunc_labels), ylab = trunc_string(g$ylabel, trunc_labels),
                  panel = function(x, y, groups=NULL, ...) {
                    if(any(c("panel","both")%in%add_key)) if(g$type=="scatter") pan_key(key=c(KEY,"background"="lightgrey","alpha.background"=0.8), x = 0.02)
                    if(g$type == "density") panel.xyplot(x=x, y=y, pch=".", col=densCols(x=x,y=y,colramp=colorRampPalette(colConv(g$BasePop[[base_o[1]]][c("densitycolorsdarkmode","densitycolorslightmode")][[color_mode]])),nbin=nbin, transformation=trans))
@@ -412,30 +417,45 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
   })
   lt$fontsize$text <- 6
   lt$fontsize$points <- 4
-  dv <- dev.cur()
   lt$grid.pars <- get.gpar()
-  if(length(dv) != 0) { # get.gpar() opens the device so we shut it down
-    if(dv != dev.cur()) dev.off(which = dev.cur())
-  } else {
-    if(length(dev.cur() != 0)) dev.off(which = dev.cur())
-  }
   lt$grid.pars$fontfamily <- "serif"
   foo = update(foo, par.settings = lt)
   if(any(c("global","both")%in%add_key)) foo = update(foo, key=KEY)
-  if(draw) plot(foo)
+  if(draw) {
+    plot(foo)
+    dv = dev.cur()
+  }
   if(stats_print) print(stats)
-  return(invisible(list("plot" = foo,
-                        "stats" = as.table(stats),
-                        "input" = list("data" = D, 
-                                      "xlim" = Xlim, "ylim" = Ylim, 
-                                      "trans_x" = trans_x, "trans_y" = trans_y,
-                                      "trans" = trans,
-                                      "base" = base_n,
-                                      "displayed" = displayed_n,
-                                      "region" = reg_n,
-                                      "viewport" = viewport,
-                                      "bin" = nbin,
-                                      "type" = ifelse(g$type=="histogram", type, g$type),
-                                      "precision" = precision,
-                                      "mode" = color_mode))))
+  ret_order = names(D) %in% c("Object Number", "x1", "x2", "y1", "y2")
+  displayed = lapply(obj$pops[displayed_n], FUN = function(p) {
+    return(p[!(names(p) %in% "obj")])
+  })
+  ret = list("plot" = foo,
+             "stats" = as.table(stats),
+             "input" = list("data" = D[ ,c(which(ret_order), which(!ret_order))], 
+                            "trunc_labels" = trunc_labels,
+                            "title" = g$title,
+                            "xlab" = g$xlab, "ylab" = g$ylab,
+                            "xlim" = Xlim, "ylim" = Ylim, 
+                            "trans_x" = trans_x, "trans_y" = trans_y,
+                            "trans" = trans,
+                            "order" = displayed_o,
+                            "base" = g$BasePop,
+                            "displayed" = displayed,
+                            "regions" = obj$regions[reg_n],
+                            "viewport" = viewport,
+                            "bin" = nbin,
+                            "type" = ifelse(g$type=="histogram", type, g$type),
+                            "histogramsmoothingfactor" = g$histogramsmoothingfactor,
+                            "normalize" = normalize,
+                            "precision" = precision,
+                            "mode" = color_mode))
+  class(ret) <- "IFC_plot"
+  return(invisible(ret))
+  },
+  finally = {
+    while(!all(dv == dev.cur())) {
+      dev.off(which = rev(dev.cur())[1])
+    }
+  })
 }
