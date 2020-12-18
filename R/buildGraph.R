@@ -40,7 +40,7 @@
 #' @param xmax Double. Graph's xmax. Default 1.
 #' @param ymin Double. Graph's xmin. Default 0.
 #' @param ymax Double. Graph's xmax. Default 1.
-#' @param title Character. Graph title label. Default wil use names of BasePop followed by names of ShownPop collapse with ', '.
+#' @param title Character. Graph title label. Default will use names of BasePop collapse with ', '.
 #' @param xlabel Character. Graph x axis label.
 #' @param ylabel Character. Graph y axis label.
 #' @param axislabelsfontsize Integer. Axis label font size. Default is 10. Allowed are: 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28.\cr
@@ -76,7 +76,7 @@
 #' Otherwise, it will use each of 'GraphRegion', 'BasePop' and 'ShownPop' names, collapse with '|'.
 #' @param xstatsorder Character. Order of stat rows.
 #' It will use each of 'GraphRegion' names & each of 'BasePop' names, reverted and collapse with '|'.
-#' @param Legend Default is list(onoff='false',x='0',y='0',witdh='96',height='128').
+#' @param Legend Default is list(list(onoff='false',x='0',y='0',witdh='96',height='128')).
 #' Not yet implemented.
 #' @param BasePop Default is list(list()). See details.
 #' @param GraphRegion Default is list(list()). Only allowed member are sub-list(s) with only one character component named 'name'.
@@ -105,7 +105,7 @@
 buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, ylocation=0,
                       f1="Object Number", f2="Object Number", scaletype=1, 
                       xmin=-1, xmax=1, ymin=0, ymax=1,
-                      title=paste0(c(unlist(lapply(BasePop, FUN=function(x) x$name)),unlist(lapply(GraphRegion, FUN=function(x) x$name))),collapse=", "),
+                      title=paste0(unlist(lapply(BasePop, FUN=function(x) x$name)),collapse=", "),
                       xlabel=f1, ylabel=f2, 
                       axislabelsfontsize=10, axistickmarklabelsfontsize=10, graphtitlefontsize=12, regionlabelsfontsize=10,
                       bincount=0, freq=c("T","F")[1], histogramsmoothingfactor=0,
@@ -118,13 +118,13 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
                       ShownPop=list(list()), ...) {
   dots = list(...)
   assert(type, len=1, alw=c("histogram","scatter","density"))
-  xlocation = na.omit(as.integer(xlocation)); xlocation = xlocation[xlocation>=0]
+  xlocation = na.omit(as.integer(xlocation));# xlocation = xlocation[xlocation>=0]
   assert(xlocation, typ="integer", len=1)
-  ylocation = na.omit(as.integer(ylocation)); ylocation = ylocation[ylocation>=0] 
+  ylocation = na.omit(as.integer(ylocation));# ylocation = ylocation[ylocation>=0] 
   assert(ylocation, typ="integer", len=1)
   assert(f1, len=1, typ="character")
   assert(stats, len=1, alw=c("true","false"))
-  if(missing(Legend)) Legend=list(onoff="false",x="0",y="0",witdh="96",height="128")
+  if(missing(Legend)) Legend=list(list(onoff="false",x="0",y="0",witdh="96",height="128"))
   ###### Removed since xsize and ysize can be freely defined
   # assert(xsize, len=1, alw=c(320,480,640))
   # assert(splitterdistance, len=1, alw=120)
@@ -178,7 +178,7 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
   if(length(BasePop)==0) BasePop = list(list("name"="All"))
   GraphRegion = lapply(GraphRegion, FUN=function(x) {  # removes GraphRegion where name is missing
     if("name"%in%names(x)) {
-      return(x["name"])
+      return(x)
     }
     return(NULL)
   })
@@ -198,8 +198,18 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
     BasePop_style_alw = "Solid" # forced for non histogram
     BasePop_fill_alw = "true" # forced for non histogram
     if(type=="density") {
-      if(length(BasePop)>1) stop("Density graphs can only display one BasePop population", call.=FALSE)
-      if(length(ShownPop)!=0) if(length(ShownPop[[1]])>0) stop("Density graphs can't display ShownPop population", call.=FALSE)
+      if(length(BasePop)>1) {
+        BasePop = BasePop[1]
+        order = paste0(rep(BasePop[[1]]$name, 5), collapse = "|")
+        warning("Density graphs can only display one BasePop population", call.=FALSE, immediate.=TRUE)
+        # stop("Density graphs can only display one BasePop population", call.=FALSE)
+      }
+      if(length(ShownPop)!=0) if(length(ShownPop[[1]])>0) {
+        ShownPop = list(list())
+        order = paste0(rep(BasePop[[1]]$name, 5), collapse = "|")
+        warning("Density graphs can't display ShownPop population", call.=FALSE, immediate.=TRUE)
+        # stop("Density graphs can't display ShownPop population", call.=FALSE)
+      }
     } else {
       if(type=="histogram") if(length(ShownPop)!=0) if(length(ShownPop[[1]])>0) stop("Histogram graphs can't display ShownPop population", call.=FALSE)
       BasePop_name_alw = BasePop_name_alw[1:3]
@@ -240,21 +250,25 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
   })
   # defines default order and xstatsorder
   b_names = unlist(lapply(BasePop, FUN=function(x) x$name))
-  g_names = unlist(lapply(GraphRegion, FUN=function(x) x$name))
+  g_names = unlist(lapply(GraphRegion, FUN=function(x) x$def))
   s_names = unlist(lapply(ShownPop, FUN=function(x) x$name))
-  xstatsorder_tmp = gsub(" & All","", unlist(lapply(b_names, FUN=function(n) {
-    if(length(g_names)!=0) {
-      return(c(n,paste(g_names, n, sep=" & ")))
-    }
-    return(n)
-  })))
+  
+  # xstatsorder_tmp = gsub(" & All","", unlist(lapply(b_names, FUN=function(n) {
+  #   if(length(g_names)!=0) {
+  #     return(c(n,paste(g_names, n, sep=" & ")))
+  #   }
+  #   return(n)
+  # })))
+  xstatsorder_tmp = c(g_names, b_names)
+  
   if(type=="histogram") order_tmp = b_names
   if(type=="density") order_tmp = rep(b_names,5)
   if(type=="scatter") {
-    order_tmp = gsub(" & All","", unlist(lapply(rev(g_names), FUN=function(n) {
-      paste(n, rev(b_names), sep=" & ")
-    })))
-    order_tmp = c(s_names, order_tmp, b_names)
+    # order_tmp = gsub(" & All","", unlist(lapply(rev(g_names), FUN=function(n) {
+    #   paste(n, rev(b_names), sep=" & ")
+    # })))
+    # order_tmp = c(s_names, order_tmp, b_names)
+    order_tmp = c(s_names, g_names, b_names)
   }
   # checks order is possible
   # note that xstatsorder is not deeply checked ... TODO ???

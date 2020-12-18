@@ -15,8 +15,7 @@ buildGraph(
   xmax = 1,
   ymin = 0,
   ymax = 1,
-  title = paste0(c(unlist(lapply(BasePop, FUN = function(x) x$name)),
-    unlist(lapply(GraphRegion, FUN = function(x) x$name))), collapse = ", "),
+  title = paste0(unlist(lapply(BasePop, FUN = function(x) x$name)), collapse = ", "),
   xlabel = f1,
   ylabel = f2,
   axislabelsfontsize = 10,
@@ -64,7 +63,7 @@ buildGraph(
 
 \item{ymax}{Double. Graph's xmax. Default 1.}
 
-\item{title}{Character. Graph title label. Default wil use names of BasePop followed by names of ShownPop collapse with ', '.}
+\item{title}{Character. Graph title label. Default will use names of BasePop collapse with ', '.}
 
 \item{xlabel}{Character. Graph x axis label.}
 
@@ -120,7 +119,7 @@ Otherwise, it will use each of 'GraphRegion', 'BasePop' and 'ShownPop' names, co
 \item{xstatsorder}{Character. Order of stat rows.
 It will use each of 'GraphRegion' names & each of 'BasePop' names, reverted and collapse with '|'.}
 
-\item{Legend}{Default is list(onoff='false',x='0',y='0',witdh='96',height='128').
+\item{Legend}{Default is list(list(onoff='false',x='0',y='0',witdh='96',height='128')).
 Not yet implemented.}
 
 \item{BasePop}{Default is list(list()). See details.}

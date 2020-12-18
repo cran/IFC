@@ -173,7 +173,7 @@ DisplayGallery <- function(...,
     force_width = dots[["force_width"]]
   }
   
-  param_extra = names(dots) %in% c("ifd","param","mode","export","size","force_width","bypass")
+  param_extra = names(dots) %in% c("ifd","param","mode","export","size","force_width","bypass","verbose")
   dots = dots[!param_extra] # remove not allowed param
   param_param = names(dots) %in% c("write_to","base64_id","base64_att","overwrite",
                                    "composite","selection","random_seed",
@@ -330,7 +330,7 @@ DisplayGallery <- function(...,
   # (object.size(ans) > 1.5e6 && getOption('DT.warn.size', TRUE)) is FALSE but I am still getting warning
   # create datatable
   datatable(escape = FALSE, rownames = FALSE, extensions = "Buttons",
-            selection = list(mode = 'api'), style = "bootstrap",
+            selection = list(mode = 'none'), style = "bootstrap",
             caption = cap,
             elementId = name,
             data = dat,

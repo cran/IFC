@@ -48,7 +48,7 @@
 #' If extract_stats is TRUE, extract_features will be automatically forced to TRUE.\cr
 #' If extract_offsets is TRUE, extract_images will be automatically forced to TRUE.\cr
 #' If extract_images is TRUE, information about images will be extracted.
-#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{http://github.com/jjvanderwal/SDMTools}
+#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{https://github.com/jjvanderwal/SDMTools}
 #' @examples
 #' if(requireNamespace("IFCdata", quietly = TRUE)) {
 #'   ## use a daf file
@@ -95,50 +95,66 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
   if(toskip == 0) stop(paste0(fileName, "\ndoes not seem to be well formatted: </Assay> not found")) 
   toskip = toskip + nchar("</Assay>") - 1
   tmp=read_xml(readBin(con = fileName, what = "raw", n = toskip), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
+  checksum=NULL
 
   ##### extracts description
   description=list("Assay"=xml_attrs(xml_find_all(tmp, "//Assay")),
-                   "ID"=xml_attrs(xml_find_all(tmp, "//SOD")),
+                   "FCS"=xml_attrs(xml_find_all(tmp, "//FCS")),
+                   "SOD"=xml_attrs(xml_find_all(tmp, "//SOD")),
                    "Images"=xml_attrs(xml_find_all(tmp, "//image")),
                    "masks"=xml_attrs(xml_find_all(tmp, "//mask")))
-  
   description=lapply(description, FUN=function(x) {as.data.frame(do.call(what="rbind", x), stringsAsFactors=FALSE)})
-  description$Images = description$Images[order(description$Images$physicalChannel),]
-  class(description$masks) <- c(class(description$masks), "IFC_masks")
-  obj_count = as.integer(description$ID$objcount)
-  description$ID$objcount = obj_count
-  checksum = checksumDAF(fileName)
-  # chan_number = nrow(description$Images) # when from daf only available channels are imported
-  chan_number = as.integer(xml_attr(xml_find_first(tmp, "//ChannelPresets"), attr = "count"))
-
-  fileName_image = paste(dirname(fileName),description$ID$file,sep="/")
-  if(file.exists(fileName_image) && (checksum == checksumXIF(fileName_image))) {
-    fileName_image = normalizePath(fileName_image, winslash = "/")
+  if(length(description$FCS)==0) {
+    description$ID = description$SOD
+    is_fcs = FALSE
   } else {
-    fileName_image = description$ID$file
+    description$ID = description$FCS
+    is_fcs = TRUE
   }
+  obj_count = as.integer(description$ID$objcount)
+  class(description$masks) <- c(class(description$masks), "IFC_masks")
+  description$ID$objcount = obj_count
+  chan_number = as.integer(xml_attr(xml_find_first(tmp, "//ChannelPresets"), attr = "count"))
   
-  for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) description$Images[, i] = as.numeric(description$Images[, i])
-  description$Images$physicalChannel = description$Images$physicalChannel + 1
-  col = description$Images[,"color"]
-  col[col=="Teal"] <- "Cyan4"
-  col[col=="Green"] <- "Green4"
-  col[col=="Lime"] <- "Chartreuse"
-  description$Images[,"color"] <- col
-  if("saturation"%in%names(description$Images)) {
-    col = description$Images[,"saturation"]
+  if(!is_fcs) {
+    description$Images = description$Images[order(description$Images$physicalChannel),]
+    checksum = checksumDAF(fileName)
+    # chan_number = nrow(description$Images) # when from daf only available channels are imported
+
+    for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) description$Images[, i] = as.numeric(description$Images[, i])
+    description$Images$physicalChannel = description$Images$physicalChannel + 1
+    col = description$Images[,"color"]
     col[col=="Teal"] <- "Cyan4"
     col[col=="Green"] <- "Green4"
     col[col=="Lime"] <- "Chartreuse"
-    description$Images[,"saturation"] <- col
+    description$Images[,"color"] <- col
+    if("saturation"%in%names(description$Images)) {
+      col = description$Images[,"saturation"]
+      col[col=="Teal"] <- "Cyan4"
+      col[col=="Green"] <- "Green4"
+      col[col=="Lime"] <- "Chartreuse"
+      description$Images[,"saturation"] <- col
+    }
+    if(extract_stats & !extract_features) {
+      extract_features = TRUE
+      message("'extract_features' has been forced to TRUE to extract statistics.")
+    }
+    
+    fileName_image = paste(dirname(fileName),description$ID$file,sep="/")
+    if(file.exists(fileName_image) && (checksum == checksumXIF(fileName_image))) {
+      fileName_image = normalizePath(fileName_image, winslash = "/")
+    } else {
+      fileName_image = description$ID$file
+    }
+  } else {
+    description$Images = as.data.frame(matrix(NA, nrow=0, ncol=12, 
+                                              dimnames = list(c(), c("name","color","physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax","tokens","baseimage","function"))))
+    if(extract_offsets) {
+      extract_offsets = FALSE
+      message("'extract_offsets' has been forced to FALSE because no offsets can be found in .daf originated from .fcs.")
+    }
+    fileName_image = description$ID$file
   }
-  if(extract_stats & !extract_features) {
-    extract_features = TRUE
-    message("extract_features has been forced to TRUE to extract statistics.")
-  }
-  
-  toread=file(description = fileName, open = "rb")
-  on.exit(close(toread), add = TRUE)
 
   offsets = NULL
   if(extract_offsets & !extract_images) { 
@@ -146,10 +162,14 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     message("'extract_images' has been forced to TRUE to extract offsets.")
   }
   
+  toread=file(description = fileName, open = "rb")
+  on.exit(close(toread), add = TRUE)
+  
   ##### checks how features and images are stored
   if(extract_features | extract_images) {
     is_binary=as.logical(na.omit(xml_attr(xml_find_first(tmp, "//Assay"), attr = "binaryfeatures")))
     if(length(is_binary)==0) {is_binary=FALSE}
+    if(is_fcs) is_binary=FALSE
     if(is_binary) {
       seek(toread,toskip+3)
       ##### extracts important values
@@ -159,7 +179,6 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       if(obj_count != obj_number) stop("mismatch between expected object count and features values stored")
     }
   }
-  
   images = data.frame()
   ##### extracts images
   if(extract_images) {
@@ -242,7 +261,8 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       if(ncol(images) != obj_count) stop("mismatch between expected object count and images numbers stored")
       img_tmp_tomodify=c("bgstd","bgmean","satcount","satpercent")
       img_tmp_tokeep=grep(paste0(img_tmp_tomodify, collapse="|"), dimnames(images)[[1]], invert = TRUE)
-      img_tmp_new=lapply(img_tmp_tomodify, FUN=function(k) do.call("cbind", strsplit(images[k,],"|", useBytes = TRUE, fixed=TRUE)))
+      img_tmp_new=list()
+      if(!is_fcs) img_tmp_new=lapply(img_tmp_tomodify, FUN=function(k) do.call("cbind", strsplit(images[k,],"|", useBytes = TRUE, fixed=TRUE)))
       tryCatch({
         images=rbind(images[img_tmp_tokeep,],do.call("rbind",img_tmp_new))
       }, error = function(e) {
@@ -251,11 +271,13 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       images=apply(images,1,as.numeric)
       rm(list=ls()[grep("img_tmp_",ls())])
       images=as.data.frame(images, stringsAsFactors = FALSE)
-      names(images)=c("id","imgIFD","mskIFD","spIFD","w","l","fs","cl","ct","objCenterX","objCenterY",
-                      paste0("bgstd",(1:chan_number)),
-                      paste0("bgmean",(1:chan_number)),
-                      paste0("satcount",(1:chan_number)),
-                      paste0("satpercent",(1:chan_number)))
+      if(!is_fcs) {
+        names(images)=c("id","imgIFD","mskIFD","spIFD","w","l","fs","cl","ct","objCenterX","objCenterY",
+                        paste0("bgstd",(1:chan_number)),
+                        paste0("bgmean",(1:chan_number)),
+                        paste0("satcount",(1:chan_number)),
+                        paste0("satpercent",(1:chan_number)))
+      }
     }
     class(images) <- c(class(images), "IFC_images")
     
@@ -288,7 +310,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
   plots = list()
   regions = list()
   stats = data.frame()
-  
+
   if(extract_features) {
     ##### extracts features definition
     features_def=lapply(xml_attrs(xml_find_all(tmp, "//UDF")), FUN=function(x) as.list(x))
@@ -353,12 +375,42 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       rm(list=c("fid"))
     }
     features_names = sapply(features_def, FUN=function(x) x$name)
+    def_def = sapply(features_def, FUN=function(x) x$def)
     names(features_def) = features_names
     names(features) = features_names
-    if(!("Object Number"%in%features_names)) {
-      features_names = c(features_names, "Object Number")
+    
+    modify_feat = FALSE
+    tmp_logical = features_names == "Object Number"
+    if(any(tmp_logical)) { # Object Number is found
+      if(any(def_def[tmp_logical] != "Object Number")) { # Object Number is not well defined # worst case because we are forced to remove it
+        # copy bad Object Number features
+        names(features)[tmp_logical] <- paste0(names(features)[tmp_logical], "_copied_by_IFC") # there should be only one
+        features_def[tmp_logical] <- lapply(features_def[tmp_logical], FUN = function(x) {
+          x$name = paste0(x$name, "_copied_by_IFC")
+          return(x)
+        })
+        modify_feat = TRUE
+        # add new Object Number feature
+        features_names = c(features_names, "Object Number")
+        features$`Object Number` = 0:(nrow(features)-1)
+        features_def = c(features_def, "Object Number" = list(name = "Object Number", type = "single", userfeaturetype = "No Parameters", def = "Object Number"))
+      } # otherwise it is ok i.e. Object Number exists and is well def
+    } else { # Object Number is not found
+      if(any(def_def == "Object Number")) { # Object Number is defined but not named Object Number
+        # copy it
+        features_names = c(features_names, "Object Number")
+        features$`Object Number` = features[, which(def_def == "Object Number")[1]] # there could be several
+        features_def = c(features_def, "Object Number" = list(name = "Object Number", type = "single", userfeaturetype = "No Parameters", def = "Object Number"))
+      } else {
+        # create it
+        features_names = c(features_names, "Object Number")
+        features$`Object Number` = 0:(nrow(features)-1)
+        features_def = c(features_def, "Object Number" = list(name = "Object Number", type = "single", userfeaturetype = "No Parameters", def = "Object Number"))
+      }
+    }
+    if(any(duplicated(features$`Object Number`))) {
       features$`Object Number` = 0:(nrow(features)-1)
-      features_def = c(features_def, "Object Number" = list(name = "Object Number", type = "single", userfeaturetype = "No Parameters", def = "Object Number"))
+      warning(paste0("found duplicated objects when reading file: ", fileName))
     }
     rownames(features) = 0:(nrow(features)-1)
     class(features) <- c(class(features),"IFC_features")
@@ -381,8 +433,16 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       plots=plots[order(plot_order[1,],plot_order[2,])]
       plots=plots[order(plot_order[2,])]
       rm(list=c("plots_tmp", "plot_order"))
+      if(modify_feat) {
+        plots = lapply(plots, FUN = function(g) {
+          if((length(g$f1)!=0) && (g$f1=="Object Number")) g$f1 = "Object Number_copied_by_IFC"
+          if((length(g$xlabel)!=0) && (g$xlabel=="Object Number")) g$xlabel = "Object Number_copied_by_IFC"
+          if((length(g$f2)!=0) && (g$f2=="Object Number")) g$f2 = "Object Number_copied_by_IFC"
+          if((length(g$ylabel)!=0) && (g$ylabel=="Object Number")) g$ylabel = "Object Number_copied_by_IFC"
+          return(g)
+        })
+      }
     }
-    class(plots) <- "IFC_graphs"
     
     ##### TODO, add something for ChannelImage, ObjectFeatureControl, StatisticsControl
     
@@ -430,6 +490,13 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     operators = c("And","Or","Not","(",")")
     l = length(pops)
     if(l>0) {
+      if(modify_feat) {
+        pops = lapply(pops, FUN = function(p) {
+          if((length(p$fx)!=0) && (p$fx=="Object Number")) p$fx = "Object Number_copied"
+          if((length(p$fy)!=0) && (p$fy=="Object Number")) p$fy = "Object Number_copied"
+          return(p)
+        })
+      }
       ###### scrambles pops (for testing) 
       # pops = pops[sample.int(length(pops))]; str(names(pops))
       
@@ -458,6 +525,28 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
         stats[,5] = as.numeric(stats[,5])
       }
     }
+    
+    #####  retrieve name(s) of graphical population created by region applied in graph
+    if(length(plots) > 0) {
+      plots = lapply(plots, FUN = function(g) {
+        if(length(g$GraphRegion) != 0) {
+          g$GraphRegion = sapply(g$GraphRegion, FUN = function(r) {
+            foo = sapply(pops,
+                   FUN = function(p) {
+                     bar = (p$type == "G") && 
+                       (p$region == r$name) && 
+                       (p$base %in% unique(unlist(lapply(g$BasePop, FUN = function(b) b$name)))) &&
+                       (g$f1 == p$fx)
+                     if(regions[[r$name]]$type != "line") bar = bar && (g$f2 == p$fy)
+                     return(bar)
+                   })
+            return(list(c(r, list(def = names(which(foo))))))
+          })
+        }
+        return(g)
+      })
+    }
+    class(plots) <- "IFC_graphs"
   }
   ans = list("description"=description, "fileName"=fileName, "fileName_image"=fileName_image, "features"=features, "features_def"=features_def, "graphs"=plots, "pops"=pops, "regions"=regions, "images"=images, "offsets"=offsets, "stats"=stats, "checksum" = checksum)
   attr(ans, "class") <- c("IFC_data") #,"analysis")

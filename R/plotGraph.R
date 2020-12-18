@@ -58,8 +58,8 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
                      color_mode = c("white","black")[1], add_key = "panel", precision = c("light","full")[1],
                      trunc_labels = 38, trans = asinh, bin, viewport = "ideas", ...) {
   dots = list(...)
-  dv <- dev.cur()
   # backup last state of graphic device
+  dv <- dev.cur()
   tryCatch({
   # old_ask <- devAskNewPage(ask = FALSE)
   # on.exit(devAskNewPage(ask = old_ask), add = TRUE)
@@ -130,9 +130,10 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
   base_n = unlist(lapply(g$BasePop, FUN=function(x) x$name))
   reg_n = unlist(lapply(g$GraphRegion, FUN=function(x) x$name))
   shown_n = unlist(lapply(g$ShownPop, FUN=function(x) x$name))
+  graph_n = unlist(lapply(g$GraphRegion, FUN=function(x) x$def))
   
   operators = c("And","Or","Not","(",")")
-  displayed_n = splitn(definition = g$order, all_names = c(base_n, reg_n, shown_n, "Selected Bin"), operators = operators)
+  displayed_n = unique(splitn(definition = g$order, all_names = c(base_n, graph_n, shown_n, "Selected Bin"), operators = operators))
   displayed_n = setdiff(displayed_n, "Selected Bin")
   displayed_r = rev(displayed_n)
   tmp = displayed_n %in% names(P)
@@ -163,41 +164,47 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
                "lines"=list(col = sapply(displayed_n, FUN=function(p) P[[p]][c("color","lightModeColor")][[color_mode]]),
                             lty = sapply(displayed_n, FUN=function(r) c(1,2,3,4,6)[match(g$BasePop[[displayed_o[r]]]$linestyle,c("Solid","Dash","Dot","DashDot","DashDotDot"))])))
     
-    stats = do.call(what="rbind", args=lapply(base_n, FUN=function(d) {
+    base_s = lapply(base_n, FUN=function(d) {
       np = sum(D[,d])
+      if(np == 0) return(structure(rep(NA, 8), names = c("count","perc",
+                                                          "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.")))
       p = c("count"=np, "perc"=100, summary(na.omit(D[D[,d],"x1"])))
-      kids_s = lapply(shown_n, FUN=function(s) {
+    })
+    kids_s = lapply(shown_n, FUN=function(s) {
+      do.call(what = "rbind", args = lapply(base_n, FUN=function(d) {
+        np = sum(D[,d])
+        if(np == 0) return(structure(rep(NA, 8), names = c("count","perc",
+                                                           "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.")))
         isin = D[,d] & D[,s]
         n = sum(isin)
         c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])))
-      })
-      kids_r = lapply(reg_n, FUN=function(r) {
+      }))
+    })
+    kids_r = lapply(reg_n, FUN=function(r) {
+      do.call(what = "rbind", args = lapply(base_n, FUN=function(d) {
         alg = 3
         reg = R[[r]]
         coords = reg["x"]
         if(trans_x!="P") coords$x = smoothLinLog(coords$x, hyper=trans_x, base=10)
+        np = sum(D[,d])
+        if(np == 0) return(structure(rep(NA, 8), names = c("count","perc",
+                                                           "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.")))
         isin = D[D[,d],"x2"]
         isin = (isin >= min(coords$x)) & (isin <= max(coords$x))
         n = sum(isin)
         c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])))
-      })
-      rbind(p, do.call(what=rbind, args=c(kids_s, kids_r)))
-    }))
-    rownames(stats) = unlist(lapply(base_n, FUN=function(x) {
-      if(length(c(shown_n, reg_n))==0) return(x)
-      return(c(x,paste(x, c(shown_n, reg_n), sep = " & ")))
-    }))
+      }))
+    })
+    stats = do.call(what=rbind, args=c(base_s, kids_s, kids_r))
+    rnames = base_n
+    if(length(reg_n) > 0) rnames = c(rnames, unlist(t(sapply(base_n, FUN = function(b) {if(b == "All") {graph_n} else {paste(reg_n, b, sep = " & ") }}))))
+    rownames(stats) = rnames
     colnames(stats) = c(colnames(stats)[1:2], paste0("x-",colnames(stats)[3:8]))
     
     smooth = (g$histogramsmoothingfactor != 0)
     # br = do.breaks(range(D[,"x2"], na.rm = TRUE, finite = TRUE), nbin)
-    if(viewport == "ideas") {
-      if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
-      D[D[,"x2"] < Xlim[1], "x2"] <- Xlim[1] # D = D[(D[,"x2"] >= Xlim[1]) & (D[,"x2"] <= Xlim[2]), ]
-      D[D[,"x2"] > Xlim[2], "x2"] <- Xlim[2] #
-    }
     if(viewport == "data") {
-      Xlim = range(D[,"x1"], na.rm = TRUE, finite = TRUE)
+      Xlim = suppressWarnings(range(D[,"x1"], na.rm = TRUE, finite = TRUE))
       if(trans_x != "P") Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
       Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
       if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
@@ -208,10 +215,26 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
         coords = reg[["x"]]
         return(c(reg$cx, coords))
       })
-      Xlim = range(c(D[,"x1"], regx), na.rm = TRUE, finite = TRUE)
+      Xlim = suppressWarnings(range(c(D[,"x1"], regx), na.rm = TRUE, finite = TRUE))
       if(trans_x != "P") Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
       Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
       if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
+    }
+    if(viewport == "ideas") {
+      if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
+      D[D[,"x2"] < Xlim[1], "x2"] <- Xlim[1] # D = D[(D[,"x2"] >= Xlim[1]) & (D[,"x2"] <= Xlim[2]), ]
+      D[D[,"x2"] > Xlim[2], "x2"] <- Xlim[2] #
+    }
+    if(!all(is.finite(Xlim))) {
+      Xlim = c(g$xmin, g$xmax)
+      if(trans_x!="P") {
+        Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
+        Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
+      }
+      if(!all(is.finite(Xlim))) Xlim = c(-1, 1)
+      if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
+      D[D[,"x2"] < Xlim[1], "x2"] <- Xlim[1]
+      D[D[,"x2"] > Xlim[2], "x2"] <- Xlim[2]
     }
     br = do.breaks(Xlim, nbin)
     
@@ -296,32 +319,47 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
     } else {
       D[,"y2"] = D[,"y1"]
     }
-    stats = do.call(what="rbind", args=lapply(base_n, FUN=function(d) {
+    base_s = lapply(base_n, FUN=function(d) {
       np = sum(D[,d])
+      if(np == 0) return(structure(rep(NA, 14), names = c("count","perc",
+                                                         "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.",
+                                                         "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.")))
       p = c("count"=np, "perc"=100, summary(na.omit(D[D[,d],"x1"])), summary(na.omit(D[D[,d],"y1"])))
-      kids_s = lapply(shown_n, FUN=function(s) {
+    })
+    kids_s = lapply(shown_n, FUN=function(s) {
+      do.call(what = "rbind", args = lapply(base_n, FUN=function(d) {
+        np = sum(D[,d])
+        if(np == 0) return(structure(rep(NA, 14), names = c("count","perc",
+                                                           "Min.","1st Qu.","Median","Mean","3rd Qu.","Max.",
+                                                           "Min.","1st Qu.","Median","Mean", "3rd Qu.","Max.")))
         isin = D[,d] & D[,s]
         n = sum(isin)
         c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])), summary(na.omit(D[isin,"y1"])))
-      })
-      kids_r = lapply(reg_n, FUN=function(r) {
-        alg = 1
-        reg = R[[r]]
-        coords = reg[c("x","y")]
-        if(trans_x!="P") coords$x = smoothLinLog(coords$x, hyper=trans_x, base=10)
-        if(trans_y!="P") coords$y = smoothLinLog(coords$y, hyper=trans_y, base=10)
-        if(reg$type=="oval") alg = 3
-        if(reg$type=="rect") alg = 2
+      }))
+    })
+    kids_r = lapply(reg_n, FUN=function(r) {
+      alg = 1
+      reg = R[[r]]
+      coords = reg[c("x","y")]
+      if(trans_x!="P") coords$x = smoothLinLog(coords$x, hyper=trans_x, base=10)
+      if(trans_y!="P") coords$y = smoothLinLog(coords$y, hyper=trans_y, base=10)
+      if(reg$type=="oval") alg = 3
+      if(reg$type=="rect") alg = 2
+      do.call(what = "rbind", args = lapply(base_n, FUN=function(d) {
+        np = sum(D[,d])
+        if(np == 0) return(structure(rep(NA, 14), names = c("count","perc",
+                                                           "Min.","1st Qu.","Median","Mean","3rd Qu.","Max.",
+                                                           "Min.","1st Qu.","Median","Mean","3rd Qu.","Max.")))
         isin = cpp_pnt_in_gate(pnts = cbind(D[D[,d],"x2"],D[D[,d],"y2"]), gate = cbind(coords$x,coords$y), algorithm = alg)
         n = sum(isin)
         c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])), summary(na.omit(D[isin,"y1"])))
-      })
-      rbind(p, do.call(what=rbind, args=c(kids_s, kids_r)))
-    }))
-    rownames(stats) = unlist(lapply(base_n, FUN=function(x) {
-      if(length(c(shown_n, reg_n))==0) return(x)
-      return(c(x,paste(x, c(shown_n, reg_n), sep = " & ")))
-    }))
+      }))
+    })
+    stats = do.call(what=rbind, args=c(base_s, kids_r, kids_s))
+    rnames = base_n
+    if(length(reg_n) > 0) rnames = c(rnames, unlist(t(sapply(base_n, FUN = function(b) {if(b == "All") {reg_n} else {paste(reg_n, b, sep = " & ") }}))))
+    if(length(shown_n) > 0) rnames = c(rnames, unlist(sapply(shown_n, FUN = function(s) paste(base_n, s, sep = " & "))))
+    rownames(stats) = rnames
     colnames(stats) = c(colnames(stats)[1:2], paste0("x-",colnames(stats)[3:8]), paste0("y-",colnames(stats)[9:14]))
     groups = NULL
 
@@ -332,10 +370,10 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
     })
     
     if(viewport == "data") {
-      Xlim = range(D[,"x1"], na.rm = TRUE, finite = TRUE)
+      Xlim = suppressWarnings(range(D[,"x1"], na.rm = TRUE, finite = TRUE))
       if(trans_x != "P") Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
       Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
-      Ylim = range(D[,"y1"], na.rm = TRUE, finite = TRUE)
+      Ylim = suppressWarnings(range(D[,"y1"], na.rm = TRUE, finite = TRUE))
       if(trans_y != "P") Ylim = smoothLinLog(Ylim, hyper=trans_y, base=10)
       Ylim = Ylim + c(-0.07,0.07)*diff(Ylim)
     }
@@ -345,7 +383,7 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
         coords = reg[["x"]]
         return(c(reg$cx, coords))
       })
-      Xlim = range(c(D[,"x1"], regx), na.rm = TRUE, finite = TRUE)
+      Xlim = suppressWarnings(range(c(D[,"x1"], regx), na.rm = TRUE, finite = TRUE))
       if(trans_x != "P") Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
       Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
       regy = sapply(reg_n, FUN=function(r) {
@@ -353,11 +391,29 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
         coords = reg[["y"]]
         return(c(reg$cy, coords))
       })
-      Ylim = range(c(D[,"y1"], regy), na.rm = TRUE, finite = TRUE)
+      Ylim = suppressWarnings(range(c(D[,"y1"], regy), na.rm = TRUE, finite = TRUE))
       if(trans_y != "P") Ylim = smoothLinLog(Ylim, hyper=trans_y, base=10)
       Ylim = Ylim + c(-0.07,0.07)*diff(Ylim)
     }
-
+    if(!all(is.finite(Xlim))) {
+      Xlim = c(g$xmin, g$xmax)
+      if(trans_x!="P") {
+        Xlim = smoothLinLog(Xlim, hyper=trans_x, base=10)
+        Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
+      }
+      if(!all(is.finite(Xlim))) Xlim = c(-1, 1)
+      if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
+    }
+    if(!all(is.finite(Ylim))) {
+      Ylim = c(g$ymin, g$ymax)
+      if(trans_y!="P") {
+        Ylim = smoothLinLog(Ylim, hyper=trans_y, base=10)
+        Ylim = Ylim + c(-0.07,0.07)*diff(Ylim)
+      }
+      if(!all(is.finite(Ylim))) Ylim = c(-1, 1)
+      if(Ylim[1] == Ylim[2]) Ylim = Ylim[1] + c(-0.07,0.07)
+    }
+    
     foo = xyplot(D[,"y2"] ~ D[,"x2"], auto.key=FALSE, xlim = Xlim, ylim = Ylim, main = trunc_string(g$title, trunc_labels), groups=groups,
                  scales =  myScales(x=list(hyper=trans_x), y=list(hyper=trans_y)),
                  xlab =  trunc_string(g$xlabel, trunc_labels), ylab = trunc_string(g$ylabel, trunc_labels),

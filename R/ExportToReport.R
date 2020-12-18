@@ -31,8 +31,8 @@
 #' @description
 #' Generates report from `IFC_data` object.
 #' @param obj an `IFC_data` object extracted with features extracted.
-#' @param selection when provided, indices of desired graphs.
-#' In such case onepage parameter is set to FALSE.
+#' @param selection when provided, indices of desired graphs.\cr
+#' In such case onepage parameter is set to FALSE.\cr
 #' Note that indices are read from left to right, from top to bottom. 
 #' @param write_to pattern used to export file(s).
 #' Placeholders, like c("\%d/\%s_fromR.pdf", "\%d/\%s_fromR.csv"), will be substituted:\cr
@@ -90,9 +90,12 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
                           trunc_labels=38, trans=asinh, bin, viewport="ideas",                                  # parameters to pass to plotGraph
                           display_progress=TRUE, ...) {
   dots = list(...)
-  # backup last state of device ask newpage and set to FALSE
-  old_ask <- devAskNewPage(ask = FALSE)
-  on.exit(devAskNewPage(ask = old_ask), add = TRUE)
+  # backup last state of graphic device
+  dv <- dev.cur()
+  tryCatch({
+  # old_ask <- devAskNewPage(ask = FALSE)
+  # on.exit(devAskNewPage(ask = old_ask), add = TRUE)
+
   # change locale
   locale_back = Sys.getlocale("LC_ALL")
   on.exit(suppressWarnings(Sys.setlocale("LC_ALL", locale = locale_back)), add = TRUE)
@@ -182,13 +185,15 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
     G = obj$graphs
     P = obj$pops
     R = obj$regions
+    if(length(G)==0) stop("there is no graph defined in 'obj'")
     # defines layout
     lay=lapply(G, FUN=function(g) with(g, c(x=xlocation,y=ylocation)))
     lay=as.data.frame(do.call(rbind, lay))
+    row.names(lay)=1:length(G)
     lay=by(lay, lay$y, FUN=function(d) {
       d=d[order(d$x), ]
       d$x=seq_along(d$x)
-      cbind("N"=as.numeric(row.names(d)), d, stringsAsFactors=FALSE)
+      cbind("N"=as.integer(row.names(d)), d, stringsAsFactors=FALSE)
     })
     lay=lapply(1:length(lay), FUN=function(i) {
       d=lay[[i]]
@@ -219,14 +224,30 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
           setPB(pb = pb_gr, value = i, title = title_progress, label = paste0("computing ",ifelse(create_pdf,"graphs and ",""),"stats"))
         }
         if(length(bin) == 0) {
-          g = plotGraph(obj, G[[i]], draw=FALSE, color_mode=color_mode, add_key=add_key,
-                        precision=precision, trunc_labels=trunc_labels, trans=trans, viewport=viewport)
+          g = try(plotGraph(obj, G[[i]], draw=FALSE, color_mode=color_mode, add_key=add_key,
+                        precision=precision, trunc_labels=trunc_labels, trans=trans, viewport=viewport), silent = TRUE)
         } else {
-          g = plotGraph(obj, G[[i]], draw=FALSE, color_mode=color_mode, add_key=add_key,
-                        precision=precision, trunc_labels=trunc_labels, trans=trans, viewport=viewport, bin=bin)
+          g = try(plotGraph(obj, G[[i]], draw=FALSE, color_mode=color_mode, add_key=add_key,
+                        precision=precision, trunc_labels=trunc_labels, trans=trans, viewport=viewport, bin=bin), silent = TRUE)
         }
-        foo = g$plot
-        stats = g$stats
+        if(inherits(x = g, what = "try-error")) {
+          foo = arrangeGrob(grid.text(label = paste0("Error: ", attr(x = g, which = "condition")$message), gp=gpar(col="red"), draw = FALSE),
+                            top = textGrob(paste0("\n",G[[i]]$title), gp = gpar(fontsize = 8, font=2, lineheight=0.5)))
+          if(G[[i]]$type=="histogram") {
+            stats = matrix(NA, nrow = 1, ncol = 8)
+            colnames(stats) = c("count","perc",
+                                "x-Min.","x-1st Qu.","x-Median","x-Mean","x-3rd Qu.","x-Max.")
+          } else {
+            stats = matrix(NA, nrow = 1, ncol = 14)
+            colnames(stats) = c("count","perc",
+                                "x-Min.","x-1st Qu.","x-Median","x-Mean","x-3rd Qu.","x-Max.",
+                                "y-Min.","y-1st Qu.","y-Median","y-Mean","y-3rd Qu.","y-Max.")
+          }
+          rownames(stats) = paste0("Error: ", G[[i]]$title)
+        } else {
+          foo = g$plot
+          stats = g$stats
+        }
         if(create_csv) {
           write.table(x=rbind(c(G[[i]]$f1,"x")), file=export_to_csv, append=TRUE, sep=",", col.names = FALSE, row.names = FALSE)
           if(G[[i]]$type!="histogram") write.table(x=rbind(c(G[[i]]$f2,"y")), file=export_to_csv, append=TRUE, sep=",", col.names = FALSE, row.names = FALSE)
@@ -255,7 +276,7 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
       if(onepage) {
         pdf(file=export_to_pdf, width = 3*max(lay$x)*2.54, height = 3*max(lay$y)*2.54, 
             family = "serif", onefile = TRUE, pagecentre = TRUE, useDingbats = FALSE)
-        on.exit(dev.off(which = dev.cur()), add = TRUE)
+        # on.exit(dev.off(which = dev.cur()), add = TRUE)
         # TODO add a progress bar
         # for(i in 1:gl) {
         #   pos = matrix(NA, ncol = max(lay$x), nrow = max(lay$y))
@@ -275,7 +296,7 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
         grid.arrange(grobs = graphs[lay$N], top = title_progress, newpage = TRUE, layout_matrix = lay_mat, as.table = FALSE)
       } else {
         pdf(file=export_to_pdf, paper = "a4", onefile = TRUE, pagecentre = TRUE, useDingbats = FALSE, family = "serif")
-        on.exit(dev.off(which = dev.cur()), add = TRUE)
+        # on.exit(dev.off(which = dev.cur()), add = TRUE)
         for(i in 1:gl) {
           grid.arrange(graphs[[i]], top = title_progress, newpage = TRUE) #, respect = TRUE)
           if(display_progress) {
@@ -290,4 +311,10 @@ ExportToReport = function(obj, selection, write_to, overwrite=FALSE, onepage=TRU
   })
   message(paste0("\n######################\n",ifelse(length(write_to)==2, "files have", "file has"), " been successfully ", ifelse(overwritten, "overwritten", "exported"),"\n"))
   return(invisible(write_to))
+  },
+  finally = {
+    while(!all(dv == dev.cur())) {
+      dev.off(which = rev(dev.cur())[1])
+    }
+  })
 }

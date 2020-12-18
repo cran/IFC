@@ -51,7 +51,7 @@
 #' if extract_images is TRUE, a warning will be sent if an object is found at an unexpected order.
 #' @param recursive whether to recursively apply \code{\link{ExtractFromXIF}} on files defining input fileName when it is a merged. Default is FALSE.
 #' @param ... Other arguments to be passed.
-#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{http://github.com/jjvanderwal/SDMTools}
+#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{https://github.com/jjvanderwal/SDMTools}
 #' @details If extract_stats is TRUE, extract_features will be automatically forced to TRUE.\cr
 #' If extract_images is TRUE, extract_offsets will be automatically forced to TRUE.\cr
 #' If extract_offsets is TRUE, offsets of images and masks IFDs will be extracted.\cr
@@ -323,6 +323,7 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
     if(length(features) != 0) { # means features were extracted
       features = as.data.frame(do.call(what = "rbind", args = features), stringsAsFactors = FALSE)
       features_names = sapply(features_def, FUN=function(x) x$name)
+      def_def = sapply(features_def, FUN=function(x) x$def)
       names(features_def) = features_names
       names(features) = features_names
       if(!("Object Number"%in%features_names)) {
@@ -330,10 +331,10 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
         features$`Object Number` = 0:(nrow(features)-1)
         features_def = c(features_def, "Object Number" = list(name = "Object Number", type = "single", userfeaturetype = "No Parameters", def = "Object Number"))
       } else { # try to define unique object id number based on "Object Number","Camera Timer","Camera Line Number" if present
-        if(all(c("Object Number","Camera Timer","Camera Line Number") %in% features_names)) {
+        if(all(c("Object Number","Camera Timer","Camera Line Number") %in% def_def)) {
           ids = rle(apply(sapply(c("Object Number","Camera Timer","Camera Line Number"),
                                  FUN=function(col) {
-                                   foo = rle(features[,col])
+                                   foo = rle(features[,which(def_def == col)[1]])
                                    bar = lapply(1:length(foo$lengths), FUN = function(i) rep(i-1, times = foo$lengths[i]))
                                    unlist(bar)
                                  }), 1, sum))
@@ -342,6 +343,10 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
           features_def = c(features_def, "Raw Number" = list(name = "Raw Number", type = "single", userfeaturetype = "No Parameters", def = "Raw Number"))
           features[, "Object Number"] = unique_id
         }
+      }
+      if(any(duplicated(features$`Object Number`))) {
+        features$`Object Number` = 0:(nrow(features)-1)
+        warning(paste0("found duplicated objects when reading file: ", fileName))
       }
       rownames(features) = 0:(nrow(features)-1)
       class(features) <- c(class(features),"IFC_features")
@@ -365,7 +370,6 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
         plots=plots[order(plot_order[2,])]
         rm(list=c("plots_tmp", "plot_order"))
       }
-      class(plots) <- "IFC_graphs"
       
       ##### TODO, add something for ChannelImage, ObjectFeatureControl, StatisticsControl
       
@@ -406,6 +410,29 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
         rm(pops_)
       }
       class(pops) <- "IFC_pops"
+      
+      #####  retrieve name(s) of graphical population created by region applied in graph
+      if(length(plots) > 0) {
+        plots = lapply(plots, FUN = function(g) {
+          if(length(g$GraphRegion) != 0) {
+            N = sapply(g$GraphRegion, FUN = function(r) {
+              foo = sapply(pops,
+                           FUN = function(p) {
+                             bar = (p$type == "G") && 
+                               (p$region == r$name) && 
+                               (p$base %in% unique(unlist(lapply(g$BasePop, FUN = function(b) b$name)))) &&
+                               (g$f1 == p$fx)
+                             if(regions[[r$name]]$type != "line") bar = bar && (g$f2 == p$fy)
+                             return(bar)
+                           })
+              return(names(which(foo)))
+            })
+            g$GraphRegion$def = N
+          }
+          return(g)
+        })
+      }
+      class(plots) <- "IFC_graphs"
     } else {
       features = data.frame()
     }

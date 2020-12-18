@@ -39,7 +39,7 @@
 #' @param display_progress whether to display a progress bar. Default is TRUE.
 #' @param title_progress character string, giving the title of the progress bar. Default is "".
 #' @param ... other arguments to be passed.
-#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{http://github.com/jjvanderwal/SDMTools}
+#' @source For pnt_in_poly_algorithm, Trigonometry, is an adaptation of Jeremy VanDerWal's code \url{https://github.com/jjvanderwal/SDMTools}
 #' @keywords internal
 popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_in_poly_epsilon = 1e-12,
                        display_progress = TRUE, title_progress = "", ...) {
@@ -62,11 +62,12 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
     on.exit(endPB(pb))
   }
   for(i in 1:L) {
-    fx.pos = NULL
-    fy.pos = NULL
+    fx_pos = NULL
+    fy_pos = NULL
     pop=pops[[i]]
     # changes styles to R compatible
-    pops[[i]]$style=c(20, 4, 3, 1, 5, 0, 2, 18, 15, 17)[pop$style==c("Simple Dot","Cross","Plus","Empty Circle","Empty Diamond","Empty Square","Empty Triangle","Solid Diamond","Solid Square","Solid Triangle")]
+    style_tmp = pop$style==c("Simple Dot","Cross","Plus","Empty Circle","Empty Diamond","Empty Square","Empty Triangle","Solid Diamond","Solid Square","Solid Triangle")
+    if(any(style_tmp)) pops[[i]]$style=c(20, 4, 3, 1, 5, 0, 2, 18, 15, 17)[style_tmp]
     # changes colors to R compatible
     if(pop$color=="Teal") {pops[[i]]$color="Cyan4"}
     if(pop$color=="Green") {pops[[i]]$color="Green4"}
@@ -74,54 +75,55 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
     if(pop$lightModeColor=="Teal") {pops[[i]]$lightModeColor="Cyan4"}
     if(pop$lightModeColor=="Green") {pops[[i]]$lightModeColor="Green4"}
     if(pop$lightModeColor=="Lime") {pops[[i]]$lightModeColor="Chartreuse"}
+    
     switch(pop$type,
            "B" = { 
              pops[[i]]$obj=rep(TRUE,obj_number)
            }, 
            "G" = {
-             pop.pos=which(names(regions)==pop$region)
-             fx.pos=which(names(features)==pop$fx)
-             x=features[,fx.pos]
-             x.lim=as.numeric(regions[[pop.pos]]$x)
-             if(regions[[pop.pos]]$type == "line") {
-               x.lim=range(x.lim)
-               pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & x>=x.lim[1] & x<=x.lim[2]
+             pop_pos=which(names(regions)==pop$region)
+             fx_pos=which(names(features)==pop$fx)
+             x=features[,fx_pos]
+             xlim=as.numeric(regions[[pop_pos]]$x)
+             if(regions[[pop_pos]]$type == "line") {
+               xlim=range(xlim)
+               pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & x>=xlim[1] & x<=xlim[2]
              } else {
-               fy.pos=which(names(features)==pop$fy)
-               y=features[,fy.pos]
-               y.lim=as.numeric(regions[[pop.pos]]$y)
-               if(regions[[pop.pos]]$xlogrange != "P") {
-                 x = smoothLinLog(x, hyper = as.numeric(regions[[pop.pos]]$xlogrange), base = 10)
-                 x.lim = smoothLinLog(x.lim, hyper = as.numeric(regions[[pop.pos]]$xlogrange), base = 10)
+               fy_pos=which(names(features)==pop$fy)
+               y=features[,fy_pos]
+               ylim=as.numeric(regions[[pop_pos]]$y)
+               if(regions[[pop_pos]]$xlogrange != "P") {
+                 x = smoothLinLog(x, hyper = as.numeric(regions[[pop_pos]]$xlogrange), base = 10)
+                 xlim = smoothLinLog(xlim, hyper = as.numeric(regions[[pop_pos]]$xlogrange), base = 10)
                }
-               if(regions[[pop.pos]]$ylogrange != "P") {
-                 y = smoothLinLog(y, hyper = as.numeric(regions[[pop.pos]]$ylogrange), base = 10)
-                 y.lim = smoothLinLog(y.lim, hyper = as.numeric(regions[[pop.pos]]$ylogrange), base = 10)
+               if(regions[[pop_pos]]$ylogrange != "P") {
+                 y = smoothLinLog(y, hyper = as.numeric(regions[[pop_pos]]$ylogrange), base = 10)
+                 ylim = smoothLinLog(ylim, hyper = as.numeric(regions[[pop_pos]]$ylogrange), base = 10)
                }
-               switch(regions[[pop.pos]]$type, 
+               switch(regions[[pop_pos]]$type, 
                       "oval" = {
-                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(x.lim,y.lim), algorithm = 3)
+                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(xlim,ylim), algorithm = 3)
                       },
                       "poly" = {
-                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(x.lim,y.lim), algorithm = pnt_in_poly_algorithm, epsilon = pnt_in_poly_epsilon)
+                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(xlim,ylim), algorithm = pnt_in_poly_algorithm, epsilon = pnt_in_poly_epsilon)
                       },
                       "rect" = {
-                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(x.lim,y.lim), algorithm = 2)
+                        pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & cpp_pnt_in_gate(pnts=cbind(x,y), gate = cbind(xlim,ylim), algorithm = 2)
                       })
              }
            }, 
            "C" = {
-             pop.def.tmp=gsub("^And$","&",pop$split)
-             pop.def.tmp=gsub("^Or$","|",pop.def.tmp)
-             pop.def.tmp=gsub("^Not$","!", pop.def.tmp)
-             for(i.popn in which(pop.def.tmp%in%pop$names)) {pop.def.tmp[i.popn]=paste0("`",pop.def.tmp[i.popn],"`")}
-             comb.tmp=sapply(pops[pop$names], FUN=function(i.pop) i.pop$obj)
+             pop_def_tmp=gsub("^And$","&",pop$split)
+             pop_def_tmp=gsub("^Or$","|",pop_def_tmp)
+             pop_def_tmp=gsub("^Not$","!", pop_def_tmp)
+             for(i_popn in which(pop_def_tmp%in%pop$names)) {pop_def_tmp[i_popn]=paste0("`",pop_def_tmp[i_popn],"`")}
+             comb_tmp=sapply(pops[pop$names], FUN=function(i_pop) i_pop$obj)
              if(obj_number == 1) {
-               comb.tmp=all(comb.tmp)
+               comb_tmp=all(comb_tmp)
              } else {
-               comb.tmp=eval(parse(text=paste0(pop.def.tmp,collapse=" ")), as.data.frame(comb.tmp, stringsAsFactors = FALSE))
+               comb_tmp=eval(parse(text=paste0(pop_def_tmp,collapse=" ")), as.data.frame(comb_tmp, stringsAsFactors = FALSE))
              }
-             pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & comb.tmp
+             pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & comb_tmp
            }, 
            "T" = {
              if(length(pop$obj) != obj_number) {
@@ -141,6 +143,6 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
       setPB(pb, value = i, title = title_progress, label = "extacting populations")
     }
   }
-  class(pops) = c(K, "Processed")
+  class(pops) = c(setdiff(K, "IFC_pops"), "IFC_pops", "Processed")
   return(pops)
 }

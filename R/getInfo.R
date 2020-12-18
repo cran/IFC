@@ -114,6 +114,8 @@ getInfo <- function(fileName,
     toskip = toskip + nchar("</Assay>") - 1
     tmp_daf = read_xml(readBin(con = fileName, what = "raw", n = toskip), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
     cname = xml_attr(xml_find_first(tmp_daf, "//SOD"), attr = "file")
+    fcs = xml_attr(xml_find_first(tmp_daf, "//FCS"), attr = "file")
+    if(!is.na(fcs)) stop("can't extract information from .daf generated from .fcs")
     found = FALSE
     checksum = checksumDAF(fileName)
     fileName_image = file.path(cifdir, paste0(splitf(cname)[c("short","ext")], collapse = ".")) # look in cifdir 1st
@@ -127,11 +129,6 @@ getInfo <- function(fileName,
     }
     
     while((interactive() && (ntry > 0) && (!found))) {
-      ntry = ntry - 1
-      if(file.exists(fileName_image)) if(getFileExt(fileName_image)=="cif") if(checksumXIF(fileName_image) == checksum) {
-        found = TRUE
-        break;
-      } 
       message(paste0("daf file does not refer to: ", fileName_image))
       old_wd = getwd()
       on.exit(setwd(old_wd), add= TRUE)
@@ -141,6 +138,11 @@ getInfo <- function(fileName,
       } else {
         fileName_image = file.choose()
       }
+      if(file.exists(fileName_image)) if(getFileExt(fileName_image)=="cif") if(checksumXIF(fileName_image) == checksum) {
+        found = TRUE
+        break;
+      } 
+      ntry = ntry - 1
     }
     if(!found) stop("can't extract information")
     fileName_image = normalizePath(fileName_image, winslash = "/")
@@ -177,29 +179,45 @@ getInfo <- function(fileName,
   channelwidth1 = IFD[[1]]$tags[["33009"]]$map # should not exceed 4 bytes
   tmp_ins = read_xml(getFullTag(IFD = IFD, which = 1, tag ="33064"), options = c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
   channelwidth2 = as.numeric(xml_text(xml_find_first(tmp_ins, xpath = "//ChannelWidth")))
-  # information in acquisition db
-  lasers_nodes = grep("Filter", grep("ExLaser", names(acquisition[["Illumination"]]), value = TRUE), value = TRUE, invert = TRUE)
-  lasers_on = acquisition$Illumination[grep("PowerOn", lasers_nodes, value = TRUE)]
-  lasers_on = as.logical(as.integer(unlist(lasers_on[order(as.integer(gsub("\\D+", "", names(lasers_on))))])))
-  lasers_power = acquisition$Illumination[grep("IntensityWatts", lasers_nodes, value = TRUE)]
-  lasers_power = sprintf("%.2f", as.numeric(unlist(lasers_power[order(as.integer(gsub("\\D+", "", names(lasers_power))))])))
-  # information in instrumen db
-  ins_lasers = lapply(as_list(xml_find_first(tmp_ins, "Illumination")), unlist)
-  lasers_nodes = grep("ExLaser", names(ins_lasers), value = TRUE)
-  lasers_present = ins_lasers[grep("Filter|LAF", grep("Present", lasers_nodes, value = TRUE), value = TRUE, invert = TRUE)]
-  lasers_present = as.logical(as.integer(unlist(lasers_present[order(as.integer(gsub("\\D+", "", names(lasers_present))))])))
-  lasers_wavelength = ins_lasers[grep("Wavelength", lasers_nodes, value = TRUE)]
-  lasers_wavelength = as.integer(unlist(lasers_wavelength[order(as.integer(gsub("\\D+", "", names(lasers_wavelength))))]))
-  lasers_minpow = ins_lasers[grep("MinPower", lasers_nodes, value = TRUE)]
-  lasers_minpow = as.numeric(unlist(lasers_minpow[order(as.integer(gsub("\\D+", "", names(lasers_minpow))))]))
-  lasers_maxpow = ins_lasers[grep("MaxPower", lasers_nodes, value = TRUE)]
-  lasers_maxpow = as.numeric(unlist(lasers_maxpow[order(as.integer(gsub("\\D+", "", names(lasers_maxpow))))]))
-  illumination = data.frame("installed" = lasers_present,
-                            "wavelength" = lasers_wavelength, 
-                            "powered" = lasers_on, 
-                            "power" = lasers_power, 
-                            "min" = lasers_minpow, 
-                            "max" = lasers_maxpow, stringsAsFactors = FALSE)
+  
+  tryCatch({
+    # information in acquisition db
+    lasers_nodes = grep("Filter", grep("ExLaser", names(acquisition[["Illumination"]]), value = TRUE), value = TRUE, invert = TRUE)
+    lasers_on = acquisition$Illumination[grep("PowerOn", lasers_nodes, value = TRUE)]
+    lasers_on = as.logical(as.integer(unlist(lasers_on[order(as.integer(gsub("\\D+", "", names(lasers_on))))])))
+    lasers_power = acquisition$Illumination[grep("IntensityWatts", lasers_nodes, value = TRUE)]
+    lasers_power = as.numeric(sprintf("%.2f", as.numeric(unlist(lasers_power[order(as.integer(gsub("\\D+", "", names(lasers_power))))]))))
+    if(length(lasers_power) != length(lasers_on)) lasers_power = rep(NA, length(lasers_on))
+    # information in instrument db
+    ins_lasers = lapply(as_list(xml_find_first(tmp_ins, "Illumination")), unlist)
+    lasers_nodes = grep("ExLaser", names(ins_lasers), value = TRUE)
+    
+    lasers_present = ins_lasers[grep("Filter|LAF", grep("Present", lasers_nodes, value = TRUE), value = TRUE, invert = TRUE)]
+    lasers_present = as.logical(as.integer(unlist(lasers_present[order(as.integer(gsub("\\D+", "", names(lasers_present))))])))
+    if(length(lasers_present) != length(lasers_on)) lasers_present = rep(NA, length(lasers_on))
+    
+    lasers_wavelength = ins_lasers[grep("Wavelength", lasers_nodes, value = TRUE)]
+    lasers_wavelength = as.integer(unlist(lasers_wavelength[order(as.integer(gsub("\\D+", "", names(lasers_wavelength))))]))
+    if(length(lasers_wavelength) != length(lasers_on)) lasers_wavelength = rep(NA, length(lasers_on))
+    
+    lasers_minpow = ins_lasers[grep("MinPower", lasers_nodes, value = TRUE)]
+    lasers_minpow = as.numeric(unlist(lasers_minpow[order(as.integer(gsub("\\D+", "", names(lasers_minpow))))]))
+    if(length(lasers_minpow) != length(lasers_on)) lasers_minpow = rep(NA, length(lasers_on))
+    
+    lasers_maxpow = ins_lasers[grep("MaxPower", lasers_nodes, value = TRUE)]
+    lasers_maxpow = as.numeric(unlist(lasers_maxpow[order(as.integer(gsub("\\D+", "", names(lasers_maxpow))))]))
+    if(length(lasers_maxpow) != length(lasers_on)) lasers_maxpow = rep(NA, length(lasers_on))
+    
+    illumination = data.frame("installed" = lasers_present,
+                              "wavelength" = lasers_wavelength, 
+                              "powered" = lasers_on, 
+                              "power" = lasers_power, 
+                              "min" = lasers_minpow, 
+                              "max" = lasers_maxpow, stringsAsFactors = FALSE)
+  }, error = function(e) {
+    illumination = data.frame(matrix(NA, ncol = 6, nrow = 0))
+    colnames(illumination) = c("installed","wavelength", "powered" ,"power" ,"min","max")
+  })
 
   infos$channelwidth = channelwidth1
   if(length(channelwidth1)==0) infos$channelwidth = channelwidth2
