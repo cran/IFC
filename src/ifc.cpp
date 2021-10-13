@@ -28,7 +28,9 @@
   along with IFC. If not, see <http://www.gnu.org/licenses/>.                   
 */
 
+#define STRICT_R_HEADERS
 #include <Rcpp.h>
+#include "../inst/include/align.hpp"
 #include "../inst/include/assert.hpp"
 #include "../inst/include/gate.hpp"
 #include "../inst/include/utils.hpp"
@@ -40,6 +42,28 @@
 #include "../inst/include/extract.hpp"
 #include "../inst/include/resize.hpp"
 using namespace Rcpp;
+
+// FROM align
+//' @title Spatial Offsets Image Correction
+//' @name cpp_align
+//' @description
+//' This function uses bilinear interpolation to apply spatial offset correction on image
+//' @param mat, a NumericMatrix.
+//' @param dx, a double x spatial offset. It has to be within ]-1,+1[. Default is NA_REAL for no change.
+//' @param dy, a double y spatial offset. It has to be within ]-1,+1[. Default is NA_REAL for no change.
+//' @details It is intended to be applied on raw images matrices from .rif files so has to generate spatial offset corrected image matrices.\cr
+//' See William E. Ortyn et al. Sensitivity Measurement and Compensation in Spectral Imaging. Cytometry A 69 852-862 (2006).
+//' \url{https://onlinelibrary.wiley.com/doi/full/10.1002/cyto.a.20306}
+//' @return a NumericMatrix.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::NumericMatrix cpp_align(const Rcpp::NumericMatrix mat,
+                              const double dx = NA_REAL,
+                              const double dy = NA_REAL) {
+  return hpp_align(mat, dx, dy);
+}
+// END align
 
 // FROM assert
 //' @title Input Parameters Assertive Tool
@@ -203,6 +227,22 @@ Rcpp::List cpp_getTAGS (const std::string fname,
   return hpp_getTAGS (fname, offset, verbose, trunc_bytes, force_trunc); 
 }
 
+//' @title IFD Fast Tags Extraction
+//' @name cpp_fastTAGS
+//' @description
+//' Returns TAGS contained within an IFD (Image Field Directory) entry.
+//' @param fname string, path to file.
+//' @param offset uint32_t, position of the IFD beginning.
+//' @param verbose bool, whether to display information (use for debugging purpose). Default is 'false'.
+//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::List cpp_fastTAGS (const std::string fname, 
+                        const uint32_t offset, 
+                        const bool verbose = false) {
+  return hpp_fastTAGS (fname, offset, verbose); 
+}
 
 //' @title IFC_offsets Computation with Object Identification
 //' @name cpp_getoffsets_wid
@@ -304,6 +344,18 @@ Rcpp::NumericVector cpp_inv_smoothLinLog (const Rcpp::NumericVector x,
   return hpp_inv_smoothLinLog (x, hyper, base, lin_comp);
 }
 
+//' @title Uint32 to Raw Conversion
+//' @name cpp_uint32_to_raw
+//' @description
+//' Converts unsigned 32bits integer to raw
+//' @param x uint32_t.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::RawVector cpp_uint32_to_raw (const uint32_t x) {
+  return hpp_uint32_to_raw (x);
+}
+
 //' @title Int32 to Uint32 32bits Conversion
 //' @name cpp_int32_to_uint32
 //' @description
@@ -328,17 +380,28 @@ int32_t cpp_uint32_to_int32 (const uint32_t x) {
   return hpp_uint32_to_int32 (x);
 }
 
-//' @title Numeric to String Conversion
-//' @name cpp_num_to_string
+//' @title Int64 to Uint64 64bits Conversion
+//' @name cpp_int64_to_uint64
 //' @description
-//' Formats numeric to string used for features, images, ... values conversion when exporting to xml.
-//' @param x a numeric vector.
-//' @param precision number of significant decimal digits to keep when abs(x) < 1. Default is 15.
-//' @return a string vector.
+//' Converts 64bits integer from signed to unsigned
+//' @param x int64_t.
 //' @keywords internal
+////' @export
 // [[Rcpp::export]]
-Rcpp::StringVector cpp_num_to_string(const Rcpp::NumericVector x, const unsigned char precision = 16) {
-  return hpp_num_to_string(x, precision);
+uint64_t cpp_int64_to_uint64 (const int64_t x) {
+  return hpp_int64_to_uint64 (x);
+}
+
+//' @title Uint64 to Int64 64bits Conversion
+//' @name cpp_uint64_to_int64
+//' @description
+//' Converts 64bits integer from unsigned to signed
+//' @param x uint64_t.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+int64_t cpp_uint64_to_int64 (const uint64_t x) {
+  return hpp_uint64_to_int64 (x);
 }
 // END trans
 
@@ -468,14 +531,74 @@ Rcpp::NumericMatrix cpp_resize (const Rcpp::NumericMatrix mat,
 Rcpp::List cpp_decomp (const std::string fname, 
                        const uint32_t offset, 
                        const uint32_t nbytes, 
-                       const R_len_t imgWidth = 1, 
-                       const R_len_t imgHeight = 1, 
-                       const R_len_t nb_channels = 1,
+                       const uint32_t imgWidth = 1, 
+                       const uint32_t imgHeight = 1, 
+                       const uint32_t nb_channels = 1,
                        const uint8_t removal = 0,
                        const uint32_t compression = 30818,
                        const bool verbose = false) {
   return hpp_decomp (fname, offset, nbytes, imgWidth, imgHeight, nb_channels, removal, compression, verbose);
 }
+
+//' @title IFC_object Decompression to RAW
+//' @name cpp_rawdecomp
+//' @description
+//' Operates decompression to raw of compressed image stored in TIFF file.
+//' @param fname string, path to file.
+//' @param offset uint32_t, position of the beginning of compressed image.
+//' @param nbytes uint32_t, number of bytes of compressed image.
+//' @param imgWidth uint32_t, Width of the decompressed image. Default is 1.
+//' @param imgHeight uint32_t, Height of the decompressed image. Default is 1.
+//' @param compression uint32_t, compression algorithm used. Default is 30818.
+//' @param bits uint8_t, bits depth. Default is 8.
+//' @param swap bool, whether to swap bytes or not. It only applies when bits is 16. Default is false.
+//' @param verbose bool, whether to display information (use for debugging purpose). Default is false.
+//' @details
+//' BSD implementations of Bio-Formats readers and writers
+//' %%
+//' Copyright (C) 2005 - 2017 Open Microscopy Environment:
+//'   - Board of Regents of the University of Wisconsin-Madison
+//'   - Glencoe Software, Inc.
+//'   - University of Dundee
+//' %%
+//' Redistribution and use in source and binary forms, with or without
+//' modification, are permitted provided that the following conditions are met:
+//' 
+//' 1. Redistributions of source code must retain the above copyright notice,
+//'    this list of conditions and the following disclaimer.
+//' 2. Redistributions in binary form must reproduce the above copyright notice,
+//'    this list of conditions and the following disclaimer in the documentation
+//'    and/or other materials provided with the distribution.
+//' 
+//' THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+//' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+//' IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+//' ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+//' LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+//' CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+//' SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+//' INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+//' CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+//' ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+//' POSSIBILITY OF SUCH DAMAGE.
+//' @source For image decompression, Lee Kamentsky's code porting from \url{https://github.com/ome/bioformats/blob/4146b9a1797501f0fec7d6cfe69124959bff96ee/components/formats-bsd/src/loci/formats/in/FlowSightReader.java}\cr
+//' cited in \url{https://linkinghub.elsevier.com/retrieve/pii/S1046-2023(16)30291-2}
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::RawVector cpp_rawdecomp (const std::string fname, 
+                               const uint32_t offset, 
+                               const uint32_t nbytes, 
+                               const uint32_t imgWidth = 1, 
+                               const uint32_t imgHeight = 1, 
+                               const uint32_t compression = 30818,
+                               const uint8_t bits = 8,
+                               const bool swap = false,
+                               const bool verbose = false) {
+  return hpp_rawdecomp (fname, offset, nbytes, imgWidth, imgHeight, compression, bits, swap, verbose);
+}
+// END decomp
+
 
 // FROM extract
 //' @title Matrix Normalization
@@ -584,6 +707,8 @@ Rcpp::NumericMatrix cpp_mark (const Rcpp::NumericMatrix A,
 //' @param force_range bool, only apply when mode is not "raw", if force_range is TRUE, then 'input_range' will be adjusted to mat range in [-4095, +inf] and gamma forced to 1. Default is false.\cr
 //' Note that this parameter takes the precedence over 'input_range' and 'full_range'.
 //' @param gamma correction. Default is 1, for no correction.
+//' @param spatialX X offset correction. Default is 0.0 for no change.
+//' @param spatialY Y offset correction. Default is 0.0 for no change.
 //' @details When add_noise is false, backgound will be automatically set to minimal pixel value for "masked" and "MC" removal method.\cr
 //' when a mask is detected, add_noise, full_range and force_range are set to false, background mean and sd to 0, and input_range to [0,3].\cr
 //' @keywords internal
@@ -601,8 +726,10 @@ Rcpp::NumericVector cpp_transform(const Rcpp::NumericMatrix mat,
                                   const double sd = 0.0,
                                   const bool full_range = false,
                                   const bool force_range = false,
-                                  const double gamma = 1.0) {
-  return hpp_transform(mat, color, msk, size, mode, type, input_range, add_noise, bg, sd, full_range, force_range, gamma); 
+                                  const double gamma = 1.0,
+                                  const double spatialX = 0.0,
+                                  const double spatialY = 0.0) {
+  return hpp_transform(mat, color, msk, size, mode, type, input_range, add_noise, bg, sd, full_range, force_range, gamma, spatialX, spatialY); 
 }
 
 //' @title IFC_object Extraction
@@ -616,6 +743,8 @@ Rcpp::NumericVector cpp_transform(const Rcpp::NumericMatrix mat,
 //' @param physicalChannel CharacterVector of indices for each channels
 //' @param xmin NumericVector of minimal values for each channels
 //' @param xmax NumericVector of maximal values for each channels
+//' @param spatialX NumericVector of X spatial offset correction for each channels
+//' @param spatialY NumericVector of Y spatial offset correction for each channels 
 //' @param removal IntegerVector of removal method to be used for each channels
 //' @param add_noise LogicalVector of whether to add_noise for each channels
 //' @param full_range LogicalVector of whether to use full_range for each channels
@@ -640,6 +769,8 @@ Rcpp::List cpp_extract (const std::string fname,
                         const Rcpp::CharacterVector physicalChannel,
                         const Rcpp::NumericVector xmin,
                         const Rcpp::NumericVector xmax,
+                        const Rcpp::NumericVector spatialX,
+                        const Rcpp::NumericVector spatialY,
                         const Rcpp::IntegerVector removal,
                         const Rcpp::LogicalVector add_noise,
                         const Rcpp::LogicalVector full_range,
@@ -650,6 +781,6 @@ Rcpp::List cpp_extract (const std::string fname,
                         const std::string mode = "raw",
                         const Rcpp::IntegerVector size = Rcpp::IntegerVector::create(0,0),
                         const bool verbose = false) {
-  return hpp_extract (fname, ifd, colors, physicalChannel, xmin, xmax, removal, add_noise, full_range, force_range, gamma, chan_to_extract, extract_msk, mode, size, verbose);
+  return hpp_extract (fname, ifd, colors, physicalChannel, xmin, xmax, spatialX, spatialY, removal, add_noise, full_range, force_range, gamma, chan_to_extract, extract_msk, mode, size, verbose);
 }
 // END extract

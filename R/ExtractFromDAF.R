@@ -43,7 +43,7 @@
 #' @param pnt_in_poly_epsilon epsilon to determine if object belongs to a polygon region or not. It only applies when algorithm is 1. Default is 1e-12.
 #' @param display_progress whether to display a progress bar. Default is TRUE.
 #' @param ... Other arguments to be passed.
-#' @details When extract_features is TRUE it allows eatures, graphs, pops, regions to be extracted.\cr
+#' @details When extract_features is TRUE it allows features, graphs, pops, regions to be extracted.\cr
 #' If extract_features is TRUE, extract_stats will be automatically forced to TRUE.\cr
 #' If extract_stats is TRUE, extract_features will be automatically forced to TRUE.\cr
 #' If extract_offsets is TRUE, extract_images will be automatically forced to TRUE.\cr
@@ -117,24 +117,17 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
   chan_number = as.integer(xml_attr(xml_find_first(tmp, "//ChannelPresets"), attr = "count"))
   
   if(!is_fcs) {
-    description$Images = description$Images[order(description$Images$physicalChannel),]
     checksum = checksumDAF(fileName)
+    
+    for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) if(i %in% names(description$Images)) description$Images[, i] = as.integer(description$Images[, i])
+    description$Images$physicalChannel = description$Images$physicalChannel + 1L
+    description$Images = description$Images[order(description$Images$physicalChannel), ]
+    
+    if(ncol(description$masks) == 0) description$masks = data.frame(type = "C", name = "MC", def =paste0(sprintf("M%02i", description$Images$physicalChannel), collapse="|Or|"))
     # chan_number = nrow(description$Images) # when from daf only available channels are imported
 
-    for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) description$Images[, i] = as.numeric(description$Images[, i])
-    description$Images$physicalChannel = description$Images$physicalChannel + 1
-    col = description$Images[,"color"]
-    col[col=="Teal"] <- "Cyan4"
-    col[col=="Green"] <- "Green4"
-    col[col=="Lime"] <- "Chartreuse"
-    description$Images[,"color"] <- col
-    if("saturation"%in%names(description$Images)) {
-      col = description$Images[,"saturation"]
-      col[col=="Teal"] <- "Cyan4"
-      col[col=="Green"] <- "Green4"
-      col[col=="Lime"] <- "Chartreuse"
-      description$Images[,"saturation"] <- col
-    }
+    description$Images[,"color"] = map_color(description$Images[,"color"])
+    if("saturation"%in%names(description$Images)) description$Images[,"saturation"] = map_color(description$Images[,"saturation"])
     if(extract_stats & !extract_features) {
       extract_features = TRUE
       message("'extract_features' has been forced to TRUE to extract statistics.")
@@ -295,11 +288,9 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     names(offsets) = paste0(c("img_","msk_"), rep(sprintf(paste0("%0",N,".f"), images$id), each = 2))
     attr(offsets, "all") = offsets
     attr(offsets, "fileName_image") = fileName_image
-    # if offsets are extracted from features and fileName_image can't be found, sum of 10 first images & masks offsets is used
-    # /!\ since retrieving 1st offset depends on fileName_image it is not used in this sum
-    # /!\ note that using offsets extracted from daf without fileName_image may lead to different results
-    # TODO ask AMNIS how checksum is computed to use same alg and place description$ID$checksum instead
     attr(offsets, "checksum") = checksumDAF(fileName)
+    attr(offsets, "obj_count") = obj_count
+    attr(offsets, "test") = +1L
     attr(offsets, "class") = "IFC_offset"
     attr(offsets, "first") = NULL
   }
@@ -340,8 +331,8 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
         features=as.data.frame(matrix(features[[1]][-1], ncol=1), stringsAsFactors = FALSE)
       } else {
         features=as.data.frame(do.call(what = cbind, args = features), stringsAsFactors = FALSE)
-        features_def = features_def[order(features[1,])]
-        features = features[-1,order(features[1,])]
+        features_def = features_def[order(unlist(features[1,]))]
+        features = features[-1,order(unlist(features[1,]))]
       }
     } else {
       features=xml_attr(xml_find_all(tmp, "//UDFValues"), attr = "fv")
@@ -418,10 +409,9 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     ##### extracts graphs information
     plots=lapply(xml_attrs(xml_find_all(tmp, "//Graph")), FUN=function(x) as.list(x))
     if(length(plots)!=0) {
-      # plots=mapply(plots, FUN=c, SIMPLIFY = FALSE)
       plots_tmp=lapply(plots, FUN=function(plot) {
         pat=paste0("//Graph[@xlocation='",plot$xlocation,"'][@ylocation='",plot$ylocation,"']")
-        sapply(c("Legend","BasePop","GraphRegion","ShownPop"), FUN=function(i_subnode){
+        sapply(c("Legend","BasePop","GraphRegion","ShownPop"), simplify=FALSE, FUN=function(i_subnode){
           lapply(xml_attrs(xml_find_all(tmp, paste(pat,i_subnode,sep="//"))), FUN=function(x) as.list(x))
         })
       })
@@ -430,8 +420,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
                   "graphtitlefontsize","regionlabelsfontsize","bincount","histogramsmoothingfactor","xsize","ysize","splitterdistance")
       plots=lapply(plots, FUN=function(x) {replace(x, plots_tmp, lapply(x[plots_tmp], as.numeric))})
       plot_order=sapply(plots, FUN=function(i_plot) as.numeric(i_plot[c("xlocation", "ylocation")]))
-      plots=plots[order(plot_order[1,],plot_order[2,])]
-      plots=plots[order(plot_order[2,])]
+      plots=plots[order(unlist(plot_order[1,]),unlist(plot_order[2,]))]
       rm(list=c("plots_tmp", "plot_order"))
       if(modify_feat) {
         plots = lapply(plots, FUN = function(g) {
@@ -450,7 +439,6 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     regions=lapply(xml_attrs(xml_find_all(tmp, "//Region")), FUN=function(x) as.list(x))
     if(length(regions) != 0) {
       names(regions)=lapply(regions, FUN=function(x) x$label)
-      # regions=mapply(regions, FUN=c, SIMPLIFY = FALSE)
       regions_tmp=c("cx","cy")
       regions=lapply(regions, FUN=function(x) {replace(x, regions_tmp, lapply(x[regions_tmp], as.numeric))})
       regions_tmp=lapply(regions, FUN=function(i_region) {
@@ -462,12 +450,8 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       rm(regions_tmp)
       ##### changes unknown color names in regions
       for(i in 1:length(regions)) {
-        if(regions[[i]]$color=="Teal") {regions[[i]]$color="Cyan4"}
-        if(regions[[i]]$color=="Green") {regions[[i]]$color="Green4"}
-        if(regions[[i]]$color=="Lime") {regions[[i]]$color="Chartreuse"}
-        if(regions[[i]]$lightcolor=="Teal") {regions[[i]]$lightcolor="Cyan4"}
-        if(regions[[i]]$lightcolor=="Green") {regions[[i]]$lightcolor="Green4"}
-        if(regions[[i]]$lightcolor=="Lime") {regions[[i]]$lightcolor="Chartreuse"}
+        regions[[i]]$color = map_color(regions[[i]]$color)
+        regions[[i]]$lightcolor = map_color(regions[[i]]$lightcolor)
       }
     }
     class(regions) <- "IFC_regions"
@@ -476,12 +460,23 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     pops=lapply(xml_attrs(xml_find_all(tmp, "//Pop")), FUN=function(x) as.list(x))
     if(length(pops)>0) {
       names(pops)=lapply(pops, FUN=function(x) x$name)
-      # pops=mapply(pops, fromIDEAS=TRUE, FUN=c, SIMPLIFY = FALSE)
-      # pops=mapply(pops, FUN=c, SIMPLIFY = FALSE)
-      pops_=lapply(pops, FUN=function(i_pop) {
-        pat=paste0("//Pop[@name='",i_pop$name,"']//ob")
-        list(obj=as.numeric(unlist(xml_attrs(xml_find_all(tmp, pat)))))
-      })
+      if(display_progress) {
+        pb_pops = newPB(session = dots$session, min = 0, max = length(pops), initial = 0, style = 3)
+        tryCatch({
+          pops_=lapply(1:length(pops), FUN=function(i_pop) {
+            setPB(pb_pops, value = i_pop, title = title_progress, label = "extracting tagged population objects")
+            pat=paste0("//Pop[@name='",pops[[i_pop]]$name,"']//ob")
+            list(obj=as.integer(unlist(xml_attrs(xml_find_all(tmp, pat)))))
+          })
+        }, error = function(e) {
+          stop(e$message)
+        }, finally = endPB(pb_pops))
+      } else {
+        pops_=lapply(1:length(pops), FUN=function(i_pop) {
+          pat=paste0("//Pop[@name='",pops[[i_pop]]$name,"']//ob")
+          list(obj=as.integer(unlist(xml_attrs(xml_find_all(tmp, pat)))))
+        })
+      }
       pops=mapply(FUN = append, pops, pops_, SIMPLIFY = FALSE)
       rm(pops_)
     }
@@ -530,17 +525,17 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     if(length(plots) > 0) {
       plots = lapply(plots, FUN = function(g) {
         if(length(g$GraphRegion) != 0) {
-          g$GraphRegion = sapply(g$GraphRegion, FUN = function(r) {
+          g$GraphRegion = lapply(g$GraphRegion, FUN = function(r) {
             foo = sapply(pops,
-                   FUN = function(p) {
-                     bar = (p$type == "G") && 
-                       (p$region == r$name) && 
-                       (p$base %in% unique(unlist(lapply(g$BasePop, FUN = function(b) b$name)))) &&
-                       (g$f1 == p$fx)
-                     if(regions[[r$name]]$type != "line") bar = bar && (g$f2 == p$fy)
-                     return(bar)
-                   })
-            return(list(c(r, list(def = names(which(foo))))))
+                         FUN = function(p) {
+                           bar = (p$type == "G") && 
+                             (p$region == r$name) && 
+                             (p$base %in% unique(unlist(lapply(g$BasePop, FUN = function(b) b$name)))) &&
+                             (g$f1 == p$fx)
+                           if(regions[[r$name]]$type != "line") bar = bar && (g$f2 == p$fy)
+                           return(bar)
+                         })
+            return(c(r, list(def = names(which(foo)))))
           })
         }
         return(g)

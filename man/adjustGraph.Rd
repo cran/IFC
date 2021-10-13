@@ -4,13 +4,15 @@
 \alias{adjustGraph}
 \title{IFC Graph Adjustment}
 \usage{
-adjustGraph(obj, selection, ...)
+adjustGraph(obj, selection, adjust_graph = TRUE, ...)
 }
 \arguments{
 \item{obj}{an object of class `IFC_data` extracted by ExtractFromDAF(extract_features = TRUE) or ExtractFromXIF(extract_features = TRUE).}
 
 \item{selection}{when provided, indices of desired graphs.\cr
 Note that indices are read from left to right, from top to bottom.}
+
+\item{adjust_graph}{whether to try to adjust graph when possible. Default is TRUE.}
 
 \item{...}{other arguments to be passed.}
 }

@@ -35,12 +35,12 @@ Accepted values are either: FALSE, "panel", "global", "both" or c("panel", "glob
 Note that it only applies when display is seen as overlaying populations.}
 
 \item{precision}{when graphs is a 2D scatter with population overlay, this argument controls amount of information displayed. Default is "light".\cr
--"light", the default, will only display points of same coordinates that are amoung the other layers.\cr
+-"light", the default, will only display points of same coordinates that are among the other layers.\cr
 -"full" will display all the layers.}
 
 \item{trunc_labels}{maximum number of characters to display for labels. Default is 38.}
 
-\item{trans}{transformation function for density graphs. Default is asinh.}
+\item{trans}{transformation function for density graphs. If missing the default, the BasePop[[1]]$densitytrans, if any, will be retrieved, otherwise asinh will be used.}
 
 \item{bin}{number of bin used for histogram / density. Default is missing.}
 
@@ -54,7 +54,7 @@ Note that it only applies when display is seen as overlaying populations.}
 \value{
 it invisibly returns a list whose members are:\cr
 -plot, "trellis" object that can be displayed using plot,\cr
--stats, a table of satistics computed for the graph,\cr
+-stats, a table of statistics computed for the graph,\cr
 -input, a list with input parameters.
 }
 \description{

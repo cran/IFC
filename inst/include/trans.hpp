@@ -107,6 +107,23 @@ Rcpp::NumericVector hpp_inv_smoothLinLog (const Rcpp::NumericVector x,
   }
 }
 
+//' @title Uint32 to Raw Conversion
+//' @name cpp_uint32_to_raw
+//' @description
+//' Converts unsigned 32bits integer to raw
+//' @param x uint32_t.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::RawVector hpp_uint32_to_raw(const uint32_t x) {
+  Rcpp::RawVector out(4);
+  out[3] = (x >> 24) & 0xff;
+  out[2] = (x >> 16) & 0xff;
+  out[1] = (x >>  8) & 0xff;
+  out[0] = (x      ) & 0xff;
+  return out;
+}
+
 //' @title Int32 to Uint32 32bits Conversion
 //' @name cpp_int32_to_uint32
 //' @description
@@ -133,50 +150,29 @@ int32_t hpp_uint32_to_int32 (const uint32_t x) {
   return out;
 }
 
-//' @title Numeric to String Conversion
-//' @name cpp_num_to_string
+//' @title Int64 to Uint64 64bits Conversion
+//' @name cpp_int64_to_uint64
 //' @description
-//' Formats numeric to string used for features, images, ... values conversion when exporting to xml.
-//' @param x a numeric vector.
-//' @param precision number of significant decimal digits to keep when abs(x) < 1. Default is 15.
-//' @return a string vector.
+//' Converts 64bits integer from signed to unsigned
+//' @param x int64_t.
 //' @keywords internal
+////' @export
 // [[Rcpp::export]]
-Rcpp::StringVector hpp_num_to_string(const Rcpp::NumericVector x, const unsigned char precision = 16) {
-  Rcpp::StringVector out(x.size());
-  std::stringstream stream;
-  std::string s;
-  unsigned char relative;
-  for(R_len_t i =0; i < x.size(); i++) {
-    if(x(i) == R_PosInf) {
-      out(i) = "+Inf";
-      continue;
-    }
-    if(x(i) == R_NegInf) {
-      out(i) = "-Inf";
-      continue;
-    }
-    if(std::isnan(x[i])) { // for NaN or NA
-      out(i) = "NaN";
-      continue;
-    }
-    if(x[i] < 1) {
-      relative = 0;
-    } else {
-      relative = std::log10(x[i]);
-      if(x[i] > std::pow(10, relative)) {
-        relative = relative + 1;
-      } else {
-        relative = relative + 2;
-      }
-    }
-    stream << std::fixed << std::setprecision(precision - relative) << x(i);
-    s = stream.str();
-    s.erase(s.find_last_not_of('0') + 1, s.size());
-    s.erase(s.find_last_not_of('.') + 1, s.size());
-    out(i) = s;
-    stream.str(std::string()); // clear stream
-  }
+uint64_t hpp_int64_to_uint64 (const int64_t x) {
+  uint64_t out = x;
+  return out;
+}
+
+//' @title Uint64 to Int64 64bits Conversion
+//' @name cpp_uint64_to_int64
+//' @description
+//' Converts 64bits integer from unsigned to signed
+//' @param x uint64_t.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+int64_t hpp_uint64_to_int64 (const uint64_t x) {
+  int64_t out = x;
   return out;
 }
 

@@ -65,6 +65,7 @@
 #' -collectionmode, the collection mode,\cr
 #' -magnification, magnification used,\cr
 #' -coremode, the core mode,\cr
+#' -evmode, the high gain mode,\cr
 #' -CrossTalkMatrix. compensation matrix applied,\cr
 #' -ChannelPresets, channel preset,\cr
 #' -ImageDisplaySettings, image display settings,\cr
@@ -74,6 +75,8 @@
 #' -checksum, checksum computed,\cr
 #' -Merged_rif, character vector of path of files used to create rif, if input file was a merged,\cr
 #' -Merged_cif, character vector of path of files used to create cif, if input file was a merged,\cr
+#' -XIF_test, integer defining XIF type,\cr
+#' -checksum, integer corresponding to file checksum,\cr
 #' -fileName, path of fileName input,\cr
 #' -fileName_image, path of fileName_image.
 #' @export
@@ -87,7 +90,6 @@ getInfo <- function(fileName,
                     ntry = +Inf,
                     ...) {
   dots = list(...)
-  if(missing(fileName)) stop("'fileName' can't be missing")
   if(missing(fileName)) stop("'fileName' can't be missing")
   tmp = duplicated(fileName)
   if(any(tmp)) {
@@ -171,7 +173,7 @@ getInfo <- function(fileName,
   infos = list("objcount" = IFD[[1]]$tags[["33018"]]$map, # should not exceed 4 bytes
                "date"=getFullTag(IFD = IFD, which = 1, "33004"),
                "instrument"=getFullTag(IFD = IFD, which = 1, "33006"),
-               "sw_raw"=getFullTag(IFD = IFD, which = 1, "33069"),
+               "sw_raw"=suppressWarnings(getFullTag(IFD = IFD, which = 1, "33069")),
                "sw_process"=getFullTag(IFD = IFD, which = 1, "33066")) 
   # determines channelwidth, very important for objectExtract() when force_width = TRUE
   # prefer using channelwidth extracted from ifd dedicated tag (=tag 33009) rather than the one from parsing ASSISTdb (=tag 33064)
@@ -232,6 +234,7 @@ getInfo <- function(fileName,
   infos$collectionmode = as.numeric(acquisition$Illumination[["CollectionMode"]])
   infos$magnification = as.numeric(acquisition$Imaging[["Magnification"]])
   infos$coremode = as.numeric(acquisition$Fluidics[["CoreMode"]])
+  infos$evmode = as.numeric(acquisition$Imaging[["EVModeEnabled"]])
   if(from == "analysis" & file_extension != "rif") {
     if(length(IFD[[1]]$tags[["33020"]]$map)!=0) {
       cross = getFullTag(IFD = IFD, which = 1, tag = "33020")
@@ -290,35 +293,27 @@ getInfo <- function(fileName,
   infos = c(infos, list("ChannelPresets" = to_list_node(xml_find_all(tmp_last, "//ChannelPresets")),
                         "ImageDisplaySettings" = to_list_node(xml_find_all(tmp_last, "//ImageDisplaySettings")),
                         "Images" = as.data.frame(do.call(what = "rbind", args = xml_attrs(xml_find_all(tmp_last, "//image"))), stringsAsFactors = FALSE),
-                        "masks" = lapply(xml_attrs(xml_find_all(tmp_last, "//mask")), FUN=strsplit, split="|", fixed=TRUE)),
+                        "masks" = as.data.frame(do.call(what="rbind", xml_attrs(xml_find_all(tmp_last, "//mask"))), stringsAsFactors=FALSE)),
             "ViewingModes" = to_list_node(xml_find_all(tmp_last, "//ViewingModes")),
             "Merged_rif" = list(Merged_rif),
             "Merged_cif" = list(Merged_cif),
+            "XIF_test" = testXIF(fileName_image),
             "checksum" = checksumXIF(fileName_image),
             "fileName" = fileName,
             "fileName_image" = normalizePath(fileName_image, winslash = "/"))
+
+  for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) if(i %in% names(infos$Images)) infos$Images[, i] = as.integer(infos$Images[, i])
+  infos$Images$physicalChannel = infos$Images$physicalChannel + 1L
+  infos$Images = infos$Images[order(infos$Images$physicalChannel), ]
   
-  infos$Images = infos$Images[order(infos$Images$physicalChannel),]
-  names(infos$masks) = sapply(infos$masks, FUN=function(x) x$name)
+  infos$Images$gamma = apply(infos$Images[,c("xmin", "xmax", "xmid", "ymid")], 1, cpp_computeGamma)
+  infos$Images[,"color"] = map_color(infos$Images[,"color"])
+  if("saturation"%in%names(infos$Images)) infos$Images[,"saturation"] = map_color(infos$Images[,"saturation"])
+  
+  if(ncol(infos$masks) == 0) infos$masks = data.frame(type = "C", name = "MC", def = paste0(sprintf("M%02i", infos$Images$physicalChannel), collapse="|Or|"))
   class(infos$masks) <- c(class(infos$masks), "IFC_masks")
   if(length(infos$ViewingModes) != 0) names(infos$ViewingModes) = sapply(infos$ViewingModes, FUN=function(x) x$name)
   
-  for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) infos$Images[, i] = as.numeric(infos$Images[, i])
-  infos$Images$physicalChannel = infos$Images$physicalChannel + 1
-  infos$Images = infos$Images[order(infos$Images$physicalChannel), ]
-  infos$Images$gamma = apply(infos$Images[,c("xmin", "xmax", "xmid", "ymid")], 1, cpp_computeGamma)
-  col = infos$Images[,"color"]
-  col[col=="Teal"] <- "Cyan4"
-  col[col=="Green"] <- "Green4"
-  col[col=="Lime"] <- "Chartreuse"
-  infos$Images[,"color"] <- col
-  if("saturation"%in%names(infos$Images)) {
-    col = infos$Images[,"saturation"]
-    col[col=="Teal"] <- "Cyan4"
-    col[col=="Green"] <- "Green4"
-    col[col=="Lime"] <- "Chartreuse"
-    infos$Images[,"saturation"] <- col
-  }
   attr(infos, "class") <- c("IFC_info",from)
   return(infos)
 }

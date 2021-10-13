@@ -54,12 +54,8 @@ toXML2_pops = function(pops, verbose = FALSE, display_progress = TRUE, title_pro
     pops_nodes = xml_new_node(name = "Pops", .children = lapply(1:L, FUN=function(i_pop) {
       setPB(pb, value = i_pop, title = title_progress, label = "converting pops (xml)")
       pop = pops[[i_pop]]
-      if(pop$color=="Cyan4") pop$color <- "Teal"
-      if(pop$lightModeColor=="Cyan4") pop$lightModeColor <- "Teal"
-      if(pop$color=="Green4") pop$color <- "Green"
-      if(pop$lightModeColor=="Green4") pop$lightModeColor <- "Green"
-      if(pop$color=="Chartreuse") pop$color <- "Lime"
-      if(pop$lightModeColor=="Chartreuse") pop$lightModeColor <- "Lime"
+      pop$color = map_color(pop$color, FALSE)
+      pop$lightModeColor = map_color(pop$lightModeColor, FALSE)
       pop$style <- names(which(pop$style == tmp_style))[1]
       switch(pop$type,
              "B" = {
@@ -85,12 +81,8 @@ toXML2_pops = function(pops, verbose = FALSE, display_progress = TRUE, title_pro
   } else {
     pops_nodes = xml_new_node(name = "Pops", .children = lapply(1:L, FUN=function(i_pop) {
       pop = pops[[i_pop]]
-      if(pop$color=="Cyan4") pop$color <- "Teal"
-      if(pop$lightModeColor=="Cyan4") pop$lightModeColor <- "Teal"
-      if(pop$color=="Green4") pop$color <- "Green"
-      if(pop$lightModeColor=="Green4") pop$lightModeColor <- "Green"
-      if(pop$color=="Chartreuse") pop$color <- "Lime"
-      if(pop$lightModeColor=="Chartreuse") pop$lightModeColor <- "Lime"
+      pop$color = map_color(pop$color, FALSE)
+      pop$lightModeColor = map_color(pop$lightModeColor, FALSE)
       pop$style <- names(which(pop$style == tmp_style))[1]
       switch(pop$type,
              "B" = {

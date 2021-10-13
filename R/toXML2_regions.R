@@ -40,12 +40,9 @@ toXML2_regions = function(regions, verbose = FALSE) {
   assert(regions, cla = "IFC_regions")
   if(length(regions)==0) return(xml_new_node(name = "Regions", text = ""))
   xml_new_node(name = "Regions", .children = lapply(regions, FUN=function(i_reg) {
-    if(i_reg$color=="Cyan4") i_reg$color <- "Teal"
-    if(i_reg$lightcolor=="Cyan4") i_reg$lightcolor <- "Teal"
-    if(i_reg$color=="Green4") i_reg$color <- "Green"
-    if(i_reg$lightcolor=="Green4") i_reg$lightcolor <- "Green"
-    if(i_reg$color=="Chartreuse") i_reg$color <- "Lime"
-    if(i_reg$lightcolor=="Chartreuse") i_reg$lightcolor <- "Lime"
+    i_reg = i_reg[sapply(i_reg, length) != 0] # to remove empty values (e.g. xtrans, ytrans)
+    i_reg$color = map_color(i_reg$color, FALSE)
+    i_reg$lightcolor = map_color(i_reg$lightcolor, FALSE)
     xml_new_node(name = "Region",
                attrs = i_reg[!grepl("^x$|^y$", names(i_reg))],
                .children = lapply(1:length(i_reg[["x"]]), FUN = function(i_coord) {

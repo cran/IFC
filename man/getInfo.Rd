@@ -50,6 +50,7 @@ a list of information (open .daf file in an text editor for more details) about 
 -collectionmode, the collection mode,\cr
 -magnification, magnification used,\cr
 -coremode, the core mode,\cr
+-evmode, the high gain mode,\cr
 -CrossTalkMatrix. compensation matrix applied,\cr
 -ChannelPresets, channel preset,\cr
 -ImageDisplaySettings, image display settings,\cr
@@ -59,6 +60,8 @@ a list of information (open .daf file in an text editor for more details) about 
 -checksum, checksum computed,\cr
 -Merged_rif, character vector of path of files used to create rif, if input file was a merged,\cr
 -Merged_cif, character vector of path of files used to create cif, if input file was a merged,\cr
+-XIF_test, integer defining XIF type,\cr
+-checksum, integer corresponding to file checksum,\cr
 -fileName, path of fileName input,\cr
 -fileName_image, path of fileName_image.
 }

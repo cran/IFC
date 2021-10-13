@@ -33,16 +33,18 @@
 #' @param obj an `IFC_data` object extracted by ExtractFromDAF(extract_features = TRUE) or ExtractFromXIF(extract_features = TRUE).
 #' @param features a character vector of features names to remove within 'obj'. Note that "Object Number" is not allowed and will be excluded from 'features' if present.
 #' @param list_only whether to return a list of elements that will be impacted by the removal. Default is TRUE.
-#' If FALSE then modified object will be returned
+#' If FALSE then modified object will be returned.
+#' @param adjust_graph whether to try to adjust graph when possible. Default is TRUE.
 #' @param ... Other arguments to be passed.
 #' @return an `IFC_data` object or a list of elements impacted by removal depending on 'list_only' parameter.
 #' @export
-data_rm_features <- function(obj, features, list_only = TRUE, ...) {
+data_rm_features <- function(obj, features, list_only = TRUE, adjust_graph = TRUE, ...) {
   dots = list(...)
   assert(obj, cla = "IFC_data")
   assert(list_only, len = 1, alw = c(TRUE,FALSE))
-  assert(features, typ = "character")
-  to_remove_features = features
+  assert(adjust_graph, len = 1, alw = c(TRUE,FALSE))
+  to_remove_features = as.character(features)
+  assert(to_remove_features, typ = "character")
   if(length(obj$features) == 0) {
     warning("'obj' contains no feature", immediate. = TRUE, call. = FALSE)
     if(list_only) {
@@ -91,8 +93,11 @@ data_rm_features <- function(obj, features, list_only = TRUE, ...) {
   LL = L - 1
   while(L != LL) {
     L = length(to_remove_features)
+    to_find = sapply(to_remove_features, protectn)
+    to_find = substr(to_find, 2, nchar(to_find) - 1)
     for(i in 1:length(obj$features_def)) {
-      if((obj$features_def[[i]]$type == "combined") && any(to_remove_pops %in% strsplit(obj$features_def[[i]]$def, split = "|", fixed = TRUE)[[1]])) {
+      # if((obj$features_def[[i]]$type == "combined") && any(to_remove_features %in% strsplit(obj$features_def[[i]]$def, split = "|", fixed = TRUE)[[1]])) {
+      if((obj$features_def[[i]]$type == "combined") && any(sapply(to_find, grepl, obj$features_def[[i]]$def))) {
         to_remove_features = c(to_remove_features, obj$features_def[[i]]$name)
       }
     }
@@ -171,6 +176,6 @@ data_rm_features <- function(obj, features, list_only = TRUE, ...) {
   pops_back = obj$pops
   obj$pops = list()
   obj = data_add_pops(obj, pops = pops_back[!(names(pops_back) %in% to_remove_pops)], ...)
-  if(length(to_remove_graphs) != 0) return(adjustGraph(obj = obj, selection = to_remove_graphs))
+  if(length(to_remove_graphs) != 0) return(adjustGraph(obj = obj, selection = to_remove_graphs, adjust_graph = adjust_graph))
   return(obj)
 }

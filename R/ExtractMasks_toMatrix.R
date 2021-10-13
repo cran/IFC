@@ -89,7 +89,7 @@ ExtractMasks_toMatrix <- function(...,
   dots = dots[!param_extra] # remove not allowed param
   param_param = names(dots) %in% c("write_to","mode","base64_id","base64_att","overwrite",
                                    "composite","selection","random_seed","size","force_width",
-                                   "removal","add_noise","full_range","force_range")
+                                   "removal","add_noise","full_range","force_range","spatial_correction")
   dots_param = dots[param_param] # keep param_param for objectParam
   dots = dots[!param_param]
   
@@ -114,23 +114,6 @@ ExtractMasks_toMatrix <- function(...,
   }
   fileName = param$fileName_image
   title_progress = basename(fileName)
-
-  # check objects to extract
-  nobj = as.numeric(param$objcount)
-  if(missing(objects)) {
-    objects = as.integer(0:(nobj - 1))
-  } else {
-    objects = na.omit(as.integer(objects))
-    tokeep = (objects >= 0) & (objects < nobj)
-    if(length(tokeep) == 0) {
-      warning("ExtractMasks_toMatrix: No objects to extract, check the objects you provided.", immediate. = TRUE, call. = FALSE)
-      return(NULL)
-    }
-    if(!all(tokeep)) {
-      warning("Some objects that are not in ", fileName, " have been automatically removed from extraction process:\n", paste0(objects[!tokeep], collapse=", "))
-      objects = objects[tokeep]
-    }
-  }
   
   # check input offsets if any
   compute_offsets = TRUE
@@ -149,21 +132,39 @@ ExtractMasks_toMatrix <- function(...,
     offsets = suppressMessages(getOffsets(fileName = param$fileName_image, fast = fast, display_progress = display_progress, verbose = verbose))
   }
   
+  # check objects to extract
+  nobj = as.integer(attr(x = offsets, which = "obj_count"))
+  
+  if(missing(objects)) {
+    objects = as.integer(0:(nobj - 1))
+  } else {
+    objects = na.omit(as.integer(objects))
+    tokeep = (objects >= 0) & (objects < nobj)
+    if(!all(tokeep)) {
+      warning("Some objects that are not in ", fileName, " have been automatically removed from extraction process:\n", paste0(objects[!tokeep], collapse=", "))
+      objects = objects[tokeep]
+    }
+  }
+  
   # extract objects
-  sel = split(objects, ceiling(seq_along(objects)/20))
+  sel = subsetOffsets(offsets = offsets, objects = objects, image_type = "msk")
+  sel = split(sel, ceiling(seq_along(sel)/20))
   L=length(sel)
+  if(L == 0) {
+    warning("ExtractMasks_toMatrix: No objects to extract, check the objects you provided.", immediate. = TRUE, call. = FALSE)
+    return(NULL)
+  }
   if(display_progress) {
     pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
     on.exit(endPB(pb))
     ans = lapply(1:L, FUN=function(i) {
       setPB(pb, value = i, title = title_progress, label = "exporting masks to matrix")
-      do.call(what = "objectExtract", args = c(list(ifd = getIFD(fileName = param$fileName_image,
-                                                                 offsets = subsetOffsets(offsets = offsets, objects = sel[[i]], image_type = "msk"),
-                                                                 trunc_bytes = 8, 
-                                                                 force_trunc = FALSE, 
-                                                                 verbose = verbose, 
-                                                                 verbosity = verbosity,
-                                                                 bypass = TRUE),
+      do.call(what = "objectExtract", args = c(list(ifd = lapply(sel[[i]],
+                                                                 FUN = function(off) cpp_getTAGS(fname = param$fileName_image,
+                                                                                                 offset = off,
+                                                                                                 trunc_bytes = 1, 
+                                                                                                 force_trunc = TRUE, 
+                                                                                                 verbose = verbose)),
                                                     param = param,
                                                     verbose = verbose,
                                                     bypass = TRUE),
@@ -171,13 +172,12 @@ ExtractMasks_toMatrix <- function(...,
     })
   } else {
     ans = lapply(1:L, FUN=function(i) {
-      do.call(what = "objectExtract", args = c(list(ifd = getIFD(fileName = param$fileName_image,
-                                                                 offsets = subsetOffsets(offsets = offsets, objects = sel[[i]], image_type = "msk"),
-                                                                 trunc_bytes = 8, 
-                                                                 force_trunc = FALSE, 
-                                                                 verbose = verbose, 
-                                                                 verbosity = verbosity,
-                                                                 bypass = TRUE), 
+      do.call(what = "objectExtract", args = c(list(ifd = lapply(sel[[i]],
+                                                                 FUN = function(off) cpp_getTAGS(fname = param$fileName_image,
+                                                                                                 offset = off,
+                                                                                                 trunc_bytes = 1, 
+                                                                                                 force_trunc = TRUE, 
+                                                                                                 verbose = verbose)),
                                                     param = param,
                                                     verbose = verbose,
                                                     bypass = TRUE),

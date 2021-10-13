@@ -27,10 +27,11 @@ buildGraph(
   histogramsmoothingfactor = 0,
   xlogrange = "P",
   ylogrange = "P",
-  splitterdistance = 120,
+  maxpoints = +Inf,
   stats = c("true", "false")[2],
   xsize = c(320, 480, 640)[1],
   ysize = xsize + ifelse(stats == "true", splitterdistance, 0),
+  splitterdistance = 120,
   xstats = "Count|\%Gated|Mean",
   ystats = xstats,
   order,
@@ -87,12 +88,14 @@ Checked but not yet implemented.}
 
 \item{histogramsmoothingfactor}{Integer. Histogram smoothing factor. Allowed are [0-20]. Only partly implemented, default is 0 for no smoothing other values will produce same smoothing.}
 
-\item{xlogrange}{determines hyper parameter of smoothLinLog transformation for x-axis. Default is "P" for no transformation.}
+\item{xlogrange}{determines transformation instruction for x-axis. Default is "P" for no transformation.}
 
-\item{ylogrange}{determines hyper parameter of smoothLinLog transformation for y-axis. Default is "P" for no transformation.}
+\item{ylogrange}{determines transformation instruction for y-axis. Default is "P" for no transformation.}
 
-\item{splitterdistance}{Integer. Default is 120.
-Checked but not yet implemented.}
+\item{maxpoints}{determines the maximum number of points to display. Default is +Inf to display all points.\cr
+If provided, values from ]0,1] will be used as a proportion of the total number of points to show.\cr
+While values values superior to 1 will be interpreted as the maximal number of points to show.\cr
+It only applies to 2D graphs. When 'type' is "histogram", +Inf will be used whatever the value provided as input.}
 
 \item{stats}{Character. Either "true" or "false" to display stats. Default is "false".}
 
@@ -100,6 +103,9 @@ Checked but not yet implemented.}
 Checked but not yet implemented.}
 
 \item{ysize}{Integer. Graph's y size. Default is 'ysize' + 'splitterdistance' when 'stats' is set to "true".
+Checked but not yet implemented.}
+
+\item{splitterdistance}{Integer. Default is 120.
 Checked but not yet implemented.}
 
 \item{xstats}{Character. x stats to be computed. Default is 'Count|\%Gated|Mean'.
@@ -141,11 +147,11 @@ Many parameters are not used or are only partly implemented, but most are checke
 For 'BasePop', if left as is "All" will be used as default.\cr
 This parameter will be built / checked according to 'type' argument.\cr
 'BasePop' has to be a list of list(s) and each sub-list should can contain several elements, but only "name" is mandatory.\cr
-The sublist mebers ar:\cr
+The sublist members are:\cr
 -"name", "linestyle", "fill",\cr
 and only when 'type' is "density"\cr
 -"densitybincount", "densitymin", "densitymax",\cr
--"densitycolors", "densitycolorslightmode", "densitycolorsdarkmode".\cr
+-"densitycolors", "densitycolorslightmode", "densitycolorsdarkmode", "densitytrans".\cr
 Each sub-list will be created automatically with the following default values (except if explicitly provided):\cr
 -linestyle='Solid',\cr
 -fill='true',\cr
@@ -153,6 +159,9 @@ Each sub-list will be created automatically with the following default values (e
 -densitycolors='-16776961|-13447886|-256|-23296|-65536|',\cr
 -densitycolorslightmode='-16776961|-13447886|-256|-23296|-65536|',\cr
 -densitycolorsdarkmode='-16776961|-13447886|-256|-23296|-65536|'\cr
+-densitytrans='asinh'\cr
+  *it can take a function to be applied to the 2D local densities\cr
+  *or a name of a feature within `IFC_data` object to draw a gradient against this feature\cr
 Note that when 'type' is "density", 'BasePop' should be of length one.\cr
 and fill will be overwritten to 'true'.
 }

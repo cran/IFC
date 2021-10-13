@@ -220,8 +220,15 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
                    "Images"=xml_attrs(xml_find_all(tmp, "//image")),
                    "masks"=xml_attrs(xml_find_all(tmp, "//mask")))
   description=lapply(description, FUN=function(x) {as.data.frame(do.call(what="rbind", x), stringsAsFactors=FALSE)})
-  description$Images = description$Images[order(description$Images$physicalChannel),]
+  
+  for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) if(i %in% names(description$Images)) description$Images[, i] = as.integer(description$Images[, i])
+  description$Images$physicalChannel = description$Images$physicalChannel + 1L
+  description$Images = description$Images[description$Images$physicalChannel %in% which(infos$in_use), ]
+  description$Images = description$Images[order(description$Images$physicalChannel), ]
+  
+  if(ncol(description$masks) == 0) description$masks = data.frame(type = "C", name = "MC", def = paste0(sprintf("M%02i", description$Images$physicalChannel), collapse="|Or|"))
   class(description$masks) <- c(class(description$masks), "IFC_masks")
+  
   chan_number = sum(infos$in_use)
   obj_number = as.integer(description$ID$objcount)
   description$ID$objcount = obj_number
@@ -234,20 +241,8 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
     fileName_image = description$ID$file
   }
   
-  for(i in c("physicalChannel","xmin","xmax","xmid","ymid","scalemin","scalemax")) description$Images[, i] = as.numeric(description$Images[, i])
-  description$Images$physicalChannel = description$Images$physicalChannel + 1
-  col = description$Images[,"color"]
-  col[col=="Teal"] <- "Cyan4"
-  col[col=="Green"] <- "Green4"
-  col[col=="Lime"] <- "Chartreuse"
-  description$Images[,"color"] <- col
-  if("saturation"%in%names(description$Images)) {
-    col = description$Images[,"saturation"]
-    col[col=="Teal"] <- "Cyan4"
-    col[col=="Green"] <- "Green4"
-    col[col=="Lime"] <- "Chartreuse"
-    description$Images[,"saturation"] <- col
-  }
+  description$Images[,"color"] = map_color(description$Images[,"color"])
+  if("saturation"%in%names(description$Images)) description$Images[,"saturation"] = map_color(description$Images[,"saturation"])
   
   if(extract_stats & !extract_features) {
     extract_features = TRUE
@@ -340,7 +335,7 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
                                  }), 1, sum))
           unique_id = unlist(sapply(1:length(ids$lengths), FUN=function(i) rep(i-1, times = ids$lengths[i])))
           features[, "Raw Number"] = features[, "Object Number"]
-          features_def = c(features_def, "Raw Number" = list(name = "Raw Number", type = "single", userfeaturetype = "No Parameters", def = "Raw Number"))
+          features_def = c(features_def, "Raw Number" = list(list(name = "Raw Number", type = "single", userfeaturetype = "No Parameters", def = "Raw Number")))
           features[, "Object Number"] = unique_id
         }
       }
@@ -350,14 +345,14 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
       }
       rownames(features) = 0:(nrow(features)-1)
       class(features) <- c(class(features),"IFC_features")
-      class(features_def) <- c(class(features),"IFC_features_def")
+      class(features_def) <- c(class(features_def),"IFC_features_def")
       
       ##### extracts graphs information
       plots=lapply(xml_attrs(xml_find_all(tmp, "//Graph")), FUN=function(x) as.list(x))
       if(length(plots)!=0) {
         plots_tmp=lapply(plots, FUN=function(plot) {
           pat=paste0("//Graph[@xlocation='",plot$xlocation,"'][@ylocation='",plot$ylocation,"']")
-          sapply(c("Legend","BasePop","GraphRegion","ShownPop"), FUN=function(i_subnode){
+          sapply(c("Legend","BasePop","GraphRegion","ShownPop"), simplify=FALSE, FUN=function(i_subnode){
             lapply(xml_attrs(xml_find_all(tmp, paste(pat,i_subnode,sep="//"))), FUN=function(x) as.list(x))
           })
         })
@@ -366,8 +361,8 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
                     "graphtitlefontsize","regionlabelsfontsize","bincount","histogramsmoothingfactor","xsize","ysize","splitterdistance")
         plots=lapply(plots, FUN=function(x) {replace(x, plots_tmp, lapply(x[plots_tmp], as.numeric))})
         plot_order=sapply(plots, FUN=function(i_plot) as.numeric(i_plot[c("xlocation", "ylocation")]))
-        plots=plots[order(plot_order[1,],plot_order[2,])]
-        plots=plots[order(plot_order[2,])]
+        plots=plots[order(unlist(plot_order[1,]),unlist(plot_order[2,]))]
+        # plots=plots[order(unlist(plot_order[2,]))]
         rm(list=c("plots_tmp", "plot_order"))
       }
       
@@ -388,12 +383,10 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
         rm(regions_tmp)
         ##### changes unknown color names in regions
         for(i in 1:length(regions)) {
-          if(regions[[i]]$color=="Teal") {regions[[i]]$color="Cyan4"}
-          if(regions[[i]]$color=="Green") {regions[[i]]$color="Green4"}
-          if(regions[[i]]$color=="Lime") {regions[[i]]$color="Chartreuse"}
-          if(regions[[i]]$lightcolor=="Teal") {regions[[i]]$lightcolor="Cyan4"}
-          if(regions[[i]]$lightcolor=="Green") {regions[[i]]$lightcolor="Green4"}
-          if(regions[[i]]$lightcolor=="Lime") {regions[[i]]$lightcolor="Chartreuse"}
+          regions[[i]]$color = map_color(regions[[i]]$color)
+          regions[[i]]$lightcolor = map_color(regions[[i]]$lightcolor)
+          if(regions[[i]]$color == "0") regions[[i]]$color <- paletteIFC("to_dark", col = regions[[i]]$lightcolor)[1, "color_R"]
+          if(regions[[i]]$lightcolor == "0") regions[[i]]$lightcolor <- paletteIFC("to_light", col = regions[[i]]$color)[1, "lightModeColor_R"]
         }
       }
       class(regions) <- "IFC_regions"
@@ -402,10 +395,23 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
       pops=lapply(xml_attrs(xml_find_all(tmp, "//Pop")), FUN=function(x) as.list(x))
       if(length(pops)>0) {
         names(pops)=lapply(pops, FUN=function(x) x$name)
-        pops_=lapply(pops, FUN=function(i_pop) {
-          pat=paste0("//Pop[@name='",i_pop$name,"']//ob")
-          list(obj=as.numeric(unlist(xml_attrs(xml_find_all(tmp, pat)))))
-        })
+        if(display_progress) {
+          pb_pops = newPB(session = dots$session, min = 0, max = length(pops), initial = 0, style = 3)
+          tryCatch({
+            pops_=lapply(1:length(pops), FUN=function(i_pop) {
+              setPB(pb_pops, value = i_pop, title = title_progress, label = "extracting tagged population objects")
+              pat=paste0("//Pop[@name='",pops[[i_pop]]$name,"']//ob")
+              list(obj=as.integer(unlist(xml_attrs(xml_find_all(tmp, pat)))))
+            })
+          }, error = function(e) {
+            stop(e$message)
+          }, finally = endPB(pb_pops))
+        } else {
+          pops_=lapply(1:length(pops), FUN=function(i_pop) {
+            pat=paste0("//Pop[@name='",pops[[i_pop]]$name,"']//ob")
+            list(obj=as.integer(unlist(xml_attrs(xml_find_all(tmp, pat)))))
+          })
+        }
         pops=mapply(FUN = append, pops, pops_, SIMPLIFY = FALSE)
         rm(pops_)
       }
@@ -415,7 +421,7 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
       if(length(plots) > 0) {
         plots = lapply(plots, FUN = function(g) {
           if(length(g$GraphRegion) != 0) {
-            N = sapply(g$GraphRegion, FUN = function(r) {
+            g$GraphRegion = lapply(g$GraphRegion, FUN = function(r) {
               foo = sapply(pops,
                            FUN = function(p) {
                              bar = (p$type == "G") && 
@@ -425,9 +431,8 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
                              if(regions[[r$name]]$type != "line") bar = bar && (g$f2 == p$fy)
                              return(bar)
                            })
-              return(names(which(foo)))
+              return(c(r, list(def = names(which(foo)))))
             })
-            g$GraphRegion$def = N
           }
           return(g)
         })

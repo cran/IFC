@@ -54,8 +54,12 @@
 #' @param bincount Integer. Histogram bin count. Default is 0. Allowed are: 0, 8, 16, 32, 64, 128, 256, 512, 1024.
 #' @param freq Character. Histogram with frequency normalization of not. Default is "T", allowed are "T" or "F".
 #' @param histogramsmoothingfactor Integer. Histogram smoothing factor. Allowed are [0-20]. Only partly implemented, default is 0 for no smoothing other values will produce same smoothing. 
-#' @param xlogrange determines hyper parameter of smoothLinLog transformation for x-axis. Default is "P" for no transformation.
-#' @param ylogrange determines hyper parameter of smoothLinLog transformation for y-axis. Default is "P" for no transformation.
+#' @param xlogrange determines transformation instruction for x-axis. Default is "P" for no transformation.
+#' @param ylogrange determines transformation instruction for y-axis. Default is "P" for no transformation.
+#' @param maxpoints determines the maximum number of points to display. Default is +Inf to display all points.\cr
+#' If provided, values from ]0,1] will be used as a proportion of the total number of points to show.\cr
+#' While values values superior to 1 will be interpreted as the maximal number of points to show.\cr
+#' It only applies to 2D graphs. When 'type' is "histogram", +Inf will be used whatever the value provided as input.
 #' @param stats Character. Either "true" or "false" to display stats. Default is "false".
 #' @param xsize Integer. Graph's x size. Default is 320 for small. Regular are: 320 (small), 480 (medium), 640 (big).
 #' Checked but not yet implemented.
@@ -85,11 +89,11 @@
 #' For 'BasePop', if left as is "All" will be used as default.\cr
 #' This parameter will be built / checked according to 'type' argument.\cr
 #' 'BasePop' has to be a list of list(s) and each sub-list should can contain several elements, but only "name" is mandatory.\cr
-#' The sublist mebers ar:\cr
+#' The sublist members are:\cr
 #' -"name", "linestyle", "fill",\cr
 #' and only when 'type' is "density"\cr
 #' -"densitybincount", "densitymin", "densitymax",\cr
-#' -"densitycolors", "densitycolorslightmode", "densitycolorsdarkmode".\cr
+#' -"densitycolors", "densitycolorslightmode", "densitycolorsdarkmode", "densitytrans".\cr
 #' Each sub-list will be created automatically with the following default values (except if explicitly provided):\cr
 #' -linestyle='Solid',\cr
 #' -fill='true',\cr
@@ -97,6 +101,9 @@
 #' -densitycolors='-16776961|-13447886|-256|-23296|-65536|',\cr
 #' -densitycolorslightmode='-16776961|-13447886|-256|-23296|-65536|',\cr
 #' -densitycolorsdarkmode='-16776961|-13447886|-256|-23296|-65536|'\cr
+#' -densitytrans='asinh'\cr
+#'   *it can take a function to be applied to the 2D local densities\cr
+#'   *or a name of a feature within `IFC_data` object to draw a gradient against this feature\cr
 #' Note that when 'type' is "density", 'BasePop' should be of length one.\cr
 #' and fill will be overwritten to 'true'.
 #' @param ... Other arguments to be passed.
@@ -109,33 +116,27 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
                       xlabel=f1, ylabel=f2, 
                       axislabelsfontsize=10, axistickmarklabelsfontsize=10, graphtitlefontsize=12, regionlabelsfontsize=10,
                       bincount=0, freq=c("T","F")[1], histogramsmoothingfactor=0,
-                      xlogrange="P", ylogrange="P", splitterdistance=120,
+                      xlogrange="P", ylogrange="P", maxpoints=+Inf,
                       stats=c("true","false")[2], xsize=c(320,480,640)[1], ysize=xsize+ifelse(stats=="true",splitterdistance,0),
-                      xstats="Count|%Gated|Mean", ystats=xstats,
+                      splitterdistance=120, xstats="Count|%Gated|Mean", ystats=xstats,
                       order, xstatsorder, Legend,
                       BasePop=list(list()),
                       GraphRegion=list(list()),
                       ShownPop=list(list()), ...) {
   dots = list(...)
   assert(type, len=1, alw=c("histogram","scatter","density"))
-  xlocation = na.omit(as.integer(xlocation));# xlocation = xlocation[xlocation>=0]
-  assert(xlocation, typ="integer", len=1)
-  ylocation = na.omit(as.integer(ylocation));# ylocation = ylocation[ylocation>=0] 
-  assert(ylocation, typ="integer", len=1)
+  xlocation = na.omit(as.integer(xlocation)); assert(xlocation, len=1)
+  ylocation = na.omit(as.integer(ylocation)); assert(ylocation, len=1)
   assert(f1, len=1, typ="character")
   assert(stats, len=1, alw=c("true","false"))
   if(missing(Legend)) Legend=list(list(onoff="false",x="0",y="0",witdh="96",height="128"))
-  ###### Removed since xsize and ysize can be freely defined
-  # assert(xsize, len=1, alw=c(320,480,640))
-  # assert(splitterdistance, len=1, alw=120)
-  # assert(ysize, len=1, alw=xsize+ifelse(stats=="true",splitterdistance,0))
-  ######
-  xsize=na.omit(as.integer(xsize)); xsize = xsize[xsize>=0]
-  assert(xsize, len=1, typ="integer")
-  ysize=na.omit(as.integer(ysize)); ysize = ysize[ysize>=0]
-  assert(ysize, len=1, typ="integer")
-  splitterdistance=na.omit(as.integer(splitterdistance)); splitterdistance = splitterdistance[splitterdistance>=0]
-  assert(splitterdistance, len=1, typ="integer")
+  xmin=na.omit(as.numeric(xmin)); assert(xmin, len=1)
+  xmax=na.omit(as.numeric(xmax)); assert(xmax, len=1)
+  ymin=na.omit(as.numeric(ymin)); assert(ymin, len=1)
+  ymax=na.omit(as.numeric(ymax)); assert(ymax, len=1)
+  xsize=na.omit(as.integer(xsize)); xsize = xsize[xsize>=0]; assert(xsize, len=1)
+  ysize=na.omit(as.integer(ysize)); ysize = ysize[ysize>=0]; assert(ysize, len=1)
+  splitterdistance=na.omit(as.integer(splitterdistance)); splitterdistance = splitterdistance[splitterdistance>=0]; assert(splitterdistance, len=1)
   assert(xlabel, len=1, typ="character")
   assert(freq, len=1, alw=c("T","F"))
   font_size_avl = as.integer(c(8:11,(6:14)*2))
@@ -147,24 +148,24 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
   if(length(histogramsmoothingfactor)==0) histogramsmoothingfactor = as.integer(0); histogramsmoothingfactor = as.integer(histogramsmoothingfactor); assert(histogramsmoothingfactor, len=1, alw=as.integer(0:20))
   
   bincount = as.integer(bincount); assert(bincount, len=1, alw=as.integer(c(0,2^(3:10))))
-  xlogrange = as.character(xlogrange)
-  ylogrange = as.character(ylogrange)
+  xlogrange = as.character(xlogrange); assert(xlogrange, len=1)
+  ylogrange = as.character(ylogrange); assert(ylogrange, len=1)
   if(xlogrange != "P") {
-    tmp = as.numeric(xlogrange)
-    if(is.na(tmp)) stop("'xlogrange' should be coercible to positive numeric")
-    if(tmp<0) stop("'xlogrange' should be coercible to positive numeric")
+    tmp = suppressWarnings(as.numeric(xlogrange))
+    if(is.na(tmp)) stop("'xlogrange' should be either \"P\" or coercible to a positive numeric")
+    if(tmp<0) stop("'xlogrange' should be either \"P\" or coercible to a positive numeric")
     xlogrange = as.character(tmp)
   }
   if(ylogrange != "P") {
-    tmp = as.numeric(ylogrange)
-    if(is.na(tmp)) stop("'ylogrange' should be coercible to positive numeric")
-    if(tmp<0) stop("'ylogrange' should be coercible to positive numeric")
+    tmp = suppressWarnings(as.numeric(ylogrange))
+    if(is.na(tmp)) stop("'ylogrange' should be either \"P\" or coercible to a positive numeric")
+    if(tmp<0) stop("'ylogrange' should be either \"P\" or coercible to a positive numeric")
     ylogrange = as.character(tmp)
   }
   stats_alw = c("Count","%Total","%Gated","%Plotted","Objects/mL","Mean","Median","Std. Dev.","MAD","CV","Minimum","Maximum","Geo. Mean","Mode","Variance","NaN")
   assert(xstats, len=1, typ="character"); stopifnot(strsplit(xstats, split="|", fixed=TRUE)[[1]] %in% stats_alw)
   assert(ystats, len=1, typ="character"); stopifnot(xstats == ystats, strsplit(ystats, split="|", fixed=TRUE)[[1]] %in% stats_alw)
-  BasePop_name_alw = c("name", "linestyle", "fill", "densitybincount", "densitymin", "densitymax", "densitycolors", "densitycolorslightmode", "densitycolorsdarkmode")
+  BasePop_name_alw = c("name", "linestyle", "fill", "densitybincount", "densitymin", "densitymax", "densitycolors", "densitycolorslightmode", "densitycolorsdarkmode", "densitytrans")
   
   # starts building args
   args=list(type=type, xlocation=xlocation, ylocation=ylocation, f1=f1)
@@ -222,7 +223,8 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
                          densitybincount="128", densitymin="0", densitymax="0",
                          densitycolors="-16776961|-13447886|-256|-23296|-65536|",
                          densitycolorslightmode="-16776961|-13447886|-256|-23296|-65536|",
-                         densitycolorsdarkmode="-16776961|-13447886|-256|-23296|-65536|")
+                         densitycolorsdarkmode="-16776961|-13447886|-256|-23296|-65536|",
+                         densitytrans="asinh")
   if(type!="density") BasePop_default = BasePop_default[1:3]
   BasePop = lapply(BasePop, FUN=function(x) {
     tmp = BasePop_name_alw %in% names(x)
@@ -241,6 +243,12 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
       })
       # overwrites fill
       BasePop_default$fill = "true"
+      # checks transformation
+      is_fun = inherits(BasePop_default$densitytrans, what="function") || !inherits(try(suppressWarnings(formals(BasePop_default$densitytrans)), silent = TRUE), what="try-error")
+      if(!is_fun) {
+        to_fun = try(eval(parse(text=paste0(deparse(BasePop_default$densitytrans), collapse = "\n"))), silent=TRUE)
+        if(!inherits(to_fun, "try-error")) BasePop_default$densitytrans = to_fun
+      }
     }
     # checks that linestyle is ok
     assert(BasePop_default$linestyle, len=1, alw=BasePop_style_alw)
@@ -261,7 +269,12 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
   # })))
   xstatsorder_tmp = c(g_names, b_names)
   
-  if(type=="histogram") order_tmp = b_names
+  if(type=="histogram") {
+    order_tmp = b_names
+    maxpoints = +Inf
+  } else {
+    maxpoints = as.numeric(maxpoints); na.omit(maxpoints[maxpoints>0]); assert(maxpoints, len=1)
+  }
   if(type=="density") order_tmp = rep(b_names,5)
   if(type=="scatter") {
     # order_tmp = gsub(" & All","", unlist(lapply(rev(g_names), FUN=function(n) {
@@ -289,13 +302,15 @@ buildGraph <- function(type=c("histogram","scatter","density")[3], xlocation=0, 
   } else {
     assert(xstatsorder, len=1, typ="character")
   }
-
+  Xtrans = dots$xtrans; parseTrans(Xtrans)
+  Ytrans = dots$ytrans; parseTrans(Ytrans)
   args = c(args, list(scaletype=scaletype, 
                       xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
                       title=title, xlabel=xlabel, ylabel=ylabel, 
                       axislabelsfontsize=axislabelsfontsize, axistickmarklabelsfontsize=axistickmarklabelsfontsize, graphtitlefontsize=graphtitlefontsize,
                       regionlabelsfontsize=regionlabelsfontsize, bincount=bincount,
-                      freq=freq, histogramsmoothingfactor=histogramsmoothingfactor, xlogrange=xlogrange, ylogrange=ylogrange, 
+                      freq=freq, histogramsmoothingfactor=histogramsmoothingfactor, xlogrange=xlogrange, ylogrange=ylogrange,
+                      xtrans=Xtrans, ytrans=Ytrans, maxpoints=maxpoints, 
                       stats=stats, xsize=xsize, ysize=ysize, splitterdistance=splitterdistance,
                       xstats=xstats, ystats=ystats, order=order, xstatsorder=xstatsorder,
                       Legend=Legend, BasePop=BasePop, GraphRegion=GraphRegion, ShownPop=ShownPop))

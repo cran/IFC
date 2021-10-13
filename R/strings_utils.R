@@ -1,6 +1,6 @@
 ################################################################################
 # This file is released under the GNU General Public License, Version 3, GPL-3 #
-# Copyright (C) 2020 Yohann Demont                                             #
+# Copyright (C) 2021 Yohann Demont                                             #
 #                                                                              #
 # It is part of IFC package, please cite:                                      #
 # -IFC: An R Package for Imaging Flow Cytometry                                #
@@ -56,13 +56,13 @@ remove_ext <- function(x) {
 #' Helper to replace special character.
 #' @param string string where specials will be replaced if found.
 #' @param replacement string replacement. Default is "_".
-#' @param specials  Default is '\\\\|\\/|\\:|\\*|\\?|\\"|\\<|\\>|\\|'.
+#' @param specials Default is '[\\|\\/|\\:|\\*|\\?|\\"|\'|\\<|\\>|\\|]'.
 #' @keywords internal
-specialr <- function(string = "", replacement = "_", specials = '\\\\|\\/|\\:|\\*|\\?|\\"|\\<|\\>|\\|') {
+specialr <- function(string = "", replacement = "_", specials = '[\\|\\/|\\:|\\*|\\?|\\"|\'|\\<|\\>|\\|]') {
   assert(replacement, len = 1, typ = "character")
   assert(specials, len = 1, typ = "character")
-  if(grepl(pattern = specials, x = replacement, perl = TRUE)) stop("'replacement' can't contain 'specials'")
-  return(gsub(pattern = specials, replacement = replacement, x = string, perl =TRUE))
+  if(grepl(pattern = specials, x = replacement, perl = FALSE)) stop("'replacement' can't contain 'specials'")
+  return(gsub(pattern = specials, replacement = replacement, x = string, perl = FALSE))
 }
 
 #' @title Name Protection
@@ -72,7 +72,7 @@ specialr <- function(string = "", replacement = "_", specials = '\\\\|\\/|\\:|\\
 #' @keywords internal
 protectn <- function(name) {
   assert(name, typ="character")
-  foo = gsub("([[:punct:]])", "\\\\\\1", name, perl=TRUE)
+  foo = gsub("(.)", "\\\\\\1", name, perl=FALSE)
   paste0("(",paste0(sapply(foo, FUN = function(i) {
     return(paste0("[", i, "]"))
   }), collapse = "|"),")")
@@ -84,15 +84,53 @@ protectn <- function(name) {
 #' @param definition population definition to be splitted
 #' @param all_names the names of all allowed populations
 #' @param operators operators used. Default is c("And", "Or", "Not", "(", ")").
-#' @param splitter the splitter that will be used to help splitting
 #' @keywords internal
-splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(", ")"), splitter = "[`~splitter~`]") {
+splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(", ")")) {
   assert(definition, len=1, typ="character")
-  if(substr(definition, 1, 1) == "|") definition = substr(definition, 2, nchar(definition)) # got a file where graph order start with "|"
   assert(all_names, typ="character")
   assert(operators, typ="character")
-  assert(splitter, len=1, typ="character")
-  return(gsub(splitter, "", strsplit(gsub(protectn(c(all_names, operators)), paste0(splitter, "\\1", splitter), definition, perl=TRUE), split=paste0(splitter, "|", splitter), fixed = TRUE)[[1]], fixed=TRUE))
+  
+  # we create a mapping between all_names and random names
+  # we also ensure that random names will not contain any specials and 
+  # will not match with themselves nor with names or operators to substitute
+  # we also order to_substitute by number of character (decreasing) to
+  # be sure that longer words will be substitute first
+  to_substitute = all_names
+  if((length(to_substitute) == 0) || (definition == "")) return(definition)
+  to_substitute = to_substitute[order(nchar(to_substitute), decreasing = TRUE)]
+  replace_with = c()
+  for(i in 1:length(to_substitute)) {
+    foo = c()
+    while((length(foo) == 0) ||
+          any(unlist(lapply(to_substitute, FUN = function(x) grepl(pattern=x, x=foo, fixed=TRUE))))) {
+      foo = random_name(n=max(9,nchar(operators))+1, special = NULL, forbidden = c(replace_with, to_substitute, operators)) 
+    }
+    replace_with = c(replace_with, foo)
+  }
+  
+  # we substitute names and operators with random names
+  ans = definition
+  for(i in 1:length(to_substitute)) { 
+    ans = gsub(pattern = to_substitute[i], replacement = replace_with[i], x = ans, fixed = TRUE)
+  }
+  
+  # we can now split the definition with "|" since random names we use
+  # do not contain this special character
+  ans = strsplit(ans, split = "|", fixed = TRUE)[[1]]
+  
+  # finally, can replace random names with their corresponding initial names
+  # from to_substitute (i.e. all_names + operators)
+  ans = sapply(ans, USE.NAMES = FALSE, FUN = function(x) {
+    foo = to_substitute[x == replace_with]
+    if(length(foo) == 0) {
+      foo = operators[x == operators]
+      if(length(foo) == 0) {
+        stop("definition contains unexpected name")
+      }
+    }
+    return(foo)
+  })
+  return(ans)
 }
 
 #' @title String Decomposition with Placeholders
@@ -160,21 +198,6 @@ splitf <- function(file = NULL) {
   class(out) <- "splitf_obj"
   return(out)
 }
-# splitf <- function(file = NULL) {
-#   f = normalizePath(file, mustWork = FALSE, winslash = "/")
-#   dir = dirname(f)
-#   b_name = basename(gsub(dir, "", f))
-#   if(dir == "") {
-#     dir = f
-#   } else {
-#     dir = suppressWarnings(normalizePath(dir, mustWork = FALSE, winslash = "/"))
-#   }
-#   ext = getFileExt(file)
-#   short = gsub(paste0("\\.", ext, "$"), "", b_name, ignore.case = TRUE)
-#   out = c("dir" = dir, "parent" = basename(dir), "ext" = ext, "short" = short, "input" = file)
-#   class(out) <- "splitf_obj"
-#   return(out)
-# }
 
 #' @title File Path Placeholders Formatting
 #' @description
@@ -189,13 +212,6 @@ formatn <- function(splitp_obj, splitf_obj, channel = "", object = "") {
     splitf_obj = list(dir = "", parent = "", file = "", ext = "")
     class(splitf_obj) <- c("splitf_obj", oldClass(splitf_obj))
   }
-  # internal function all these checks are useless
-  # if(missing(splitp_obj)) stop("'splitp_obj' can't be missing")
-  #   assert(splitp_obj, cla = "splitp_obj")
-  #   assert(splitf_obj, cla = c("splitf_obj"))
-  #   channel = as.character(channel); assert(channel, len = 1, typ = "character")
-  #   object = as.character(object); assert(object, len = 1, typ = "character")
-  # }
   N = names(splitp_obj$decomp)
   splitp_obj$decomp[N == "dir"] <- splitf_obj["dir"]
   splitp_obj$decomp[N == "parent"] <- splitf_obj["parent"]
@@ -206,14 +222,176 @@ formatn <- function(splitp_obj, splitf_obj, channel = "", object = "") {
   return(paste0(splitp_obj$decomp, collapse=""))
 }
 
+#' @title First Letter Only Capitalization
+#' @description
+#' Helper to capitalize the first letter of strings and leave the rest to lower case
+#' @param text a string
+#' @keywords internal
+toCapFirstOnly <- function(text) {
+  x = as.character(text)
+  paste0(toupper(substr(x,1,1)), tolower(substr(x,2,nchar(x))))
+}
+
+#' @title Color Mapping
+#' @name map_color
+#' @description
+#' Converts IDEAS/INSPIRE colors toR and inversely
+#' @param color a character vector Default is missing.
+#' @param toR whether to convert color toR or back. Default is TRUE.
+#' @return a character vector
+#' @keywords internal
+map_color <- function(color, toR = TRUE) {
+  set1 = c("Teal", "Green", "Lime", "Control")
+  set2 = c("Cyan4", "Green4", "Chartreuse", "Gray81")
+  if(toR) {
+    foo = color %in% set1
+    if(any(foo)) {
+      bar = sapply(color[foo], FUN = function(x) which(set1 %in% x))
+      color[foo] <- set2[bar]
+    }
+  } else {
+    foo = color %in% set2
+    if(any(foo)) {
+      bar = sapply(color[foo], FUN = function(x) which(set2 %in% x))
+      color[foo] <- set1[bar]
+    }
+  }
+  return(color)
+}
+
+#' @title Style Mapping
+#' @name map_style
+#' @description
+#' Converts IDEAS/INSPIRE style toR and inversely
+#' @param style a pch (converted to integer) or a character vector. Default is missing.
+#' @param toR whether to convert color toR or back. Default is FALSE.
+#' @return an integer vector when toR is TRUE or a character vector.
+#' @keywords internal
+map_style <- function(style, toR = FALSE) {
+  set1 = c("Simple Dot", "Cross", "Plus", 
+                       "Empty Circle", "Empty Diamond", "Empty Square", 
+                       "Empty Triangle", "Solid Diamond", "Solid Square", 
+                       "Solid Triangle")
+  set2 = c(20, 4, 3, 1, 5, 0, 2, 18, 15, 17)
+  if(toR) {
+    foo = style %in% set1
+    if(any(foo)) {
+      bar = sapply(style[foo], FUN = function(x) which(set1 %in% x))
+      style[foo] <- set2[bar]
+    }
+    if(!all(style %in% set2)) stop("not supported 'style'")
+    style = as.integer(style)
+  } else {
+    style_ = suppressWarnings(as.integer(style))
+    foo = style_ %in% set2
+    if(any(foo)) {
+      bar = sapply(style_[foo], FUN = function(x) which(set2 %in% x))
+      style[foo] <- set1[bar]
+    }
+    if(!all(style %in% set1)) stop("not supported 'style'")
+  }
+  return(style)
+}
+
+#' @title Random Name Generator
+#' @name random_name
+#' @description
+#' Generates random name
+#' @param n number of characters of the desired return name. Default is 10.
+#' @param ALPHA upper case letters. Default is LETTERS.
+#' @param alpha lower case letters. Default is letters.
+#' @param num integer to use. Default is 0:9 
+#' @param special characters. Default is c("#", "@@", "?", "!", "&", "\%", "$").
+#' @param forbidden forbidden character strings. Default is character().
+#' @return a character string
+#' @keywords internal
+random_name <- function(n = 10, ALPHA = LETTERS, alpha = letters, num = 0L:9L, special = c("#", "@", "?", "!", "&", "%", "$"), forbidden = character()) {
+  if(length(ALPHA)!=0) assert(ALPHA, alw = LETTERS)
+  if(length(alpha)!=0) assert(alpha, alw = letters)
+  if(length(num)!=0) assert(num, cla="integer", alw = 0L:9L)
+  id = paste0(sample(x = c(ALPHA, alpha, num, special), size = n), collapse = "")
+  while(id %in% forbidden) { id <- random_name(n = n, ALPHA = ALPHA, alpha = alpha, num = num, special = special, forbidden = forbidden) }
+  return(id)
+}
+
 #' @title Numeric to String Formatting
 #' @name num_to_string
 #' @description
 #' Formats numeric to string used for features, images, ... values conversion when exporting to xml.
 #' @param x a numeric vector.
-#' @param precision number of significant decimal digits to keep when abs(x) < 1. Default is 15.
+#' @param precision number of significant decimal digits to keep. Default is 22.
 #' @return a string vector.
 #' @keywords internal
-num_to_string <- function(x, precision = 16) {
-  return(cpp_num_to_string(x, precision))
+num_to_string <- function(x, precision = 22) {
+  old <- options("scipen")
+  on.exit(options(old))
+  options("scipen" = 18)
+  xx = toupper(as.character(round(x, precision)))
+  xx[is.na(x)] <- "NaN"
+  return(xx)
+}
+
+#' @title Next Component Prediction
+#' @description
+#' Helper to define next allowed component in a boolean vector.
+#' @param x a string, current component.
+#' @param count an integer, representing current number of opened/closed bracket.
+#' @return a vector of next allowed components.
+#' @keywords internal
+next_bool = function(x = "", count = 0L) {
+  return(switch(x,
+                "And" = {
+                  c("Not", "(", "obj")
+                },
+                "Or" = {
+                  c("Not", "(", "obj")
+                },
+                "Not" = {
+                  c("(", "obj")
+                },
+                "(" = {
+                  c("Not", "(", "obj")
+                },
+                ")" = {
+                  tmp = c("And", "Or")
+                  if(count > 0) tmp = c(tmp, ")")
+                  tmp
+                },
+                {  
+                  tmp = c("And", "Or")
+                  if(count > 0) tmp = c(tmp, ")")
+                  tmp
+                }))
+}
+
+#' @title Boolean Expression Validation
+#' @description
+#' Helper to check if a boolean vector is valid.
+#' @param x a string vector representing the boolean expression to be validated.
+#' @param all_names a character vector of scalars which are allowed to be part of the the boolean expression.
+#' @return x is returned if no exception is raised during validation process.
+#' @keywords internal
+validate_bool = function(x = "", all_names = "") {
+  operators = c("And", "Or", "Not", "(", ")")
+  all_names = setdiff(all_names, c(operators, ""))
+  if(!any(all_names %in% x)) stop("object definition is not possible: no match found")
+  count = 0L
+  alw = c("Not", "(", "obj")
+  lapply(1:length(x), FUN = function(i) {
+    if(x[i] == "(") count <<- count + 1L
+    if(x[i] == ")") count <<- count - 1L
+    if(x[i] %in% alw) {
+      alw <<- next_bool(x[i], count)
+      return(NULL)
+    } else {
+      if(("obj" %in% alw) && (x[i] %in% all_names)) {
+        alw <<- next_bool(x[i], count)
+        return(NULL)
+      }
+    }
+    stop("object definition is not possible: '",x[i],"' is not allowed at position [",i,"] in\n",x)
+  })
+  if(count != 0) stop("object definition is not possible: invalid number of opened bracket")
+  if(x[length(x)] %in% c("And", "Or", "Not", "(")) stop("object definition is not possible: it should not end with '",x[length(x)],"'")
+  return(x)
 }
