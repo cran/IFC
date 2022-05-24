@@ -2,7 +2,7 @@
 % Please edit documentation in R/strings_utils.R
 \name{remove_ext}
 \alias{remove_ext}
-\title{File Extenstion Removal}
+\title{File Extension Removal}
 \usage{
 remove_ext(x)
 }
@@ -10,7 +10,7 @@ remove_ext(x)
 \item{x}{a file path}
 }
 \description{
-Remove file extension from file path
+Removes file extension from file path
 }
 \details{
 file extension will be removed

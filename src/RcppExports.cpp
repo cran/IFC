@@ -65,6 +65,78 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_fast_rowAny
+Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_rowAny(const Rcpp::Nullable<Rcpp::LogicalVector> M_);
+RcppExport SEXP _IFC_cpp_fast_rowAny(SEXP M_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::LogicalVector> >::type M_(M_SEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_rowAny(M_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_listAny
+Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_listAny(const Rcpp::Nullable<Rcpp::List> L_);
+RcppExport SEXP _IFC_cpp_fast_listAny(SEXP L_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::List> >::type L_(L_SEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_listAny(L_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_range
+Rcpp::NumericVector cpp_fast_range(const Rcpp::Nullable<Rcpp::NumericVector> x_);
+RcppExport SEXP _IFC_cpp_fast_range(SEXP x_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type x_(x_SEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_range(x_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_sample
+Rcpp::IntegerVector cpp_fast_sample(const R_len_t n, const R_len_t size, const bool replace);
+RcppExport SEXP _IFC_cpp_fast_sample(SEXP nSEXP, SEXP sizeSEXP, SEXP replaceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const R_len_t >::type n(nSEXP);
+    Rcpp::traits::input_parameter< const R_len_t >::type size(sizeSEXP);
+    Rcpp::traits::input_parameter< const bool >::type replace(replaceSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_sample(n, size, replace));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_get_bytes_order
+Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order(const R_len_t obj, const Rcpp::Nullable<Rcpp::IntegerVector> byt_, const Rcpp::Nullable<Rcpp::IntegerVector> ord_, const bool rev);
+RcppExport SEXP _IFC_cpp_get_bytes_order(SEXP objSEXP, SEXP byt_SEXP, SEXP ord_SEXP, SEXP revSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const R_len_t >::type obj(objSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::IntegerVector> >::type byt_(byt_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::IntegerVector> >::type ord_(ord_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type rev(revSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_get_bytes_order(obj, byt_, ord_, rev));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_replace_non_finite
+Rcpp::Nullable<Rcpp::NumericVector> cpp_replace_non_finite(const Rcpp::Nullable<Rcpp::NumericVector> V_, const double by);
+RcppExport SEXP _IFC_cpp_replace_non_finite(SEXP V_SEXP, SEXP bySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type V_(V_SEXP);
+    Rcpp::traits::input_parameter< const double >::type by(bySEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_replace_non_finite(V_, by));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_computeGamma
 double cpp_computeGamma(const Rcpp::NumericVector V);
 RcppExport SEXP _IFC_cpp_computeGamma(SEXP VSEXP) {
@@ -272,18 +344,195 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_v_int32_to_uint32
+Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int32_to_uint32(Rcpp::Nullable<Rcpp::NumericVector> V);
+RcppExport SEXP _IFC_cpp_v_int32_to_uint32(SEXP VSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericVector> >::type V(VSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_v_int32_to_uint32(V));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_v_int64_to_uint64
+Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int64_to_uint64(Rcpp::Nullable<Rcpp::NumericVector> V);
+RcppExport SEXP _IFC_cpp_v_int64_to_uint64(SEXP VSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::Nullable<Rcpp::NumericVector> >::type V(VSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_v_int64_to_uint64(V));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_scanFirst
-std::size_t cpp_scanFirst(const std::string fname, const std::string target, const std::size_t start, const std::size_t end, const uint8_t buf_size);
-RcppExport SEXP _IFC_cpp_scanFirst(SEXP fnameSEXP, SEXP targetSEXP, SEXP startSEXP, SEXP endSEXP, SEXP buf_sizeSEXP) {
+std::size_t cpp_scanFirst(const std::string fname, const Rcpp::RawVector raw, const std::size_t start, const std::size_t end, const uint8_t buf_size);
+RcppExport SEXP _IFC_cpp_scanFirst(SEXP fnameSEXP, SEXP rawSEXP, SEXP startSEXP, SEXP endSEXP, SEXP buf_sizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const std::string >::type fname(fnameSEXP);
-    Rcpp::traits::input_parameter< const std::string >::type target(targetSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::RawVector >::type raw(rawSEXP);
     Rcpp::traits::input_parameter< const std::size_t >::type start(startSEXP);
     Rcpp::traits::input_parameter< const std::size_t >::type end(endSEXP);
     Rcpp::traits::input_parameter< const uint8_t >::type buf_size(buf_sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(cpp_scanFirst(fname, target, start, end, buf_size));
+    rcpp_result_gen = Rcpp::wrap(cpp_scanFirst(fname, raw, start, end, buf_size));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_factor
+SEXP cpp_fast_factor(SEXP x, const bool handleNA);
+RcppExport SEXP _IFC_cpp_fast_factor(SEXP xSEXP, SEXP handleNASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const bool >::type handleNA(handleNASEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_factor(x, handleNA));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_group_df
+Rcpp::IntegerVector cpp_group_df(const Rcpp::DataFrame df);
+RcppExport SEXP _IFC_cpp_group_df(SEXP dfSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::DataFrame >::type df(dfSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_group_df(df));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_coord_to_px
+Rcpp::IntegerMatrix cpp_coord_to_px(const Rcpp::NumericVector x, const Rcpp::NumericVector y, const Rcpp::NumericVector param);
+RcppExport SEXP _IFC_cpp_coord_to_px(SEXP xSEXP, SEXP ySEXP, SEXP paramSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector >::type param(paramSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_coord_to_px(x, y, param));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_as_nativeRaster
+Rcpp::IntegerMatrix cpp_as_nativeRaster(const Rcpp::IntegerVector x);
+RcppExport SEXP _IFC_cpp_as_nativeRaster(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_as_nativeRaster(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_draw
+Rcpp::IntegerVector cpp_draw(const Rcpp::IntegerVector img, const Rcpp::IntegerMatrix coords, const Rcpp::LogicalMatrix mask, const Rcpp::IntegerMatrix color, const R_len_t blur_size, const double blur_sd);
+RcppExport SEXP _IFC_cpp_draw(SEXP imgSEXP, SEXP coordsSEXP, SEXP maskSEXP, SEXP colorSEXP, SEXP blur_sizeSEXP, SEXP blur_sdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector >::type img(imgSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerMatrix >::type coords(coordsSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::LogicalMatrix >::type mask(maskSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerMatrix >::type color(colorSEXP);
+    Rcpp::traits::input_parameter< const R_len_t >::type blur_size(blur_sizeSEXP);
+    Rcpp::traits::input_parameter< const double >::type blur_sd(blur_sdSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_draw(img, coords, mask, color, blur_size, blur_sd));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_raster
+Rcpp::IntegerVector cpp_raster(const uint16_t width, const uint16_t height, const Rcpp::List obj, const Rcpp::Nullable <Rcpp::IntegerVector> bg_);
+RcppExport SEXP _IFC_cpp_raster(SEXP widthSEXP, SEXP heightSEXP, SEXP objSEXP, SEXP bg_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const uint16_t >::type width(widthSEXP);
+    Rcpp::traits::input_parameter< const uint16_t >::type height(heightSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List >::type obj(objSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable <Rcpp::IntegerVector> >::type bg_(bg_SEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_raster(width, height, obj, bg_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_DF_M
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_M(const Rcpp::Nullable<Rcpp::DataFrame> Df_, const Rcpp::Nullable<Rcpp::NumericVector> M_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_DF_M(SEXP Df_SEXP, SEXP M_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df_(Df_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type M_(M_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_DF_M(Df_, M_, add_id));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_M_DF
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_M_DF(const Rcpp::Nullable<Rcpp::NumericVector> M_, const Rcpp::Nullable<Rcpp::DataFrame> Df_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_M_DF(SEXP M_SEXP, SEXP Df_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type M_(M_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df_(Df_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_M_DF(M_, Df_, add_id));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_DF_DF
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_DF(const Rcpp::Nullable<Rcpp::DataFrame> Df1_, const Rcpp::Nullable<Rcpp::DataFrame> Df2_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_DF_DF(SEXP Df1_SEXP, SEXP Df2_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df1_(Df1_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df2_(Df2_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_DF_DF(Df1_, Df2_, add_id));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_M_M
+Rcpp::Nullable<Rcpp::NumericVector> cpp_fast_cbind_M_M(const Rcpp::Nullable<Rcpp::NumericVector> M1_, const Rcpp::Nullable<Rcpp::NumericVector> M2_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_M_M(SEXP M1_SEXP, SEXP M2_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type M1_(M1_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::NumericVector> >::type M2_(M2_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_M_M(M1_, M2_, add_id));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_DF_L
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_L(const Rcpp::Nullable<Rcpp::DataFrame> Df_, const Rcpp::Nullable<Rcpp::List> L_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_DF_L(SEXP Df_SEXP, SEXP L_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df_(Df_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::List> >::type L_(L_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_DF_L(Df_, L_, add_id));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_fast_cbind_L_DF
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_L_DF(const Rcpp::Nullable<Rcpp::List> L_, const Rcpp::Nullable<Rcpp::DataFrame> Df_, const bool add_id);
+RcppExport SEXP _IFC_cpp_fast_cbind_L_DF(SEXP L_SEXP, SEXP Df_SEXP, SEXP add_idSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::List> >::type L_(L_SEXP);
+    Rcpp::traits::input_parameter< const Rcpp::Nullable<Rcpp::DataFrame> >::type Df_(Df_SEXP);
+    Rcpp::traits::input_parameter< const bool >::type add_id(add_idSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_fast_cbind_L_DF(L_, Df_, add_id));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -472,6 +721,12 @@ static const R_CallMethodDef CallEntries[] = {
     {"_IFC_cpp_assert", (DL_FUNC) &_IFC_cpp_assert, 6},
     {"_IFC_cpp_ell_coord", (DL_FUNC) &_IFC_cpp_ell_coord, 2},
     {"_IFC_cpp_pnt_in_gate", (DL_FUNC) &_IFC_cpp_pnt_in_gate, 4},
+    {"_IFC_cpp_fast_rowAny", (DL_FUNC) &_IFC_cpp_fast_rowAny, 1},
+    {"_IFC_cpp_fast_listAny", (DL_FUNC) &_IFC_cpp_fast_listAny, 1},
+    {"_IFC_cpp_fast_range", (DL_FUNC) &_IFC_cpp_fast_range, 1},
+    {"_IFC_cpp_fast_sample", (DL_FUNC) &_IFC_cpp_fast_sample, 3},
+    {"_IFC_cpp_get_bytes_order", (DL_FUNC) &_IFC_cpp_get_bytes_order, 4},
+    {"_IFC_cpp_replace_non_finite", (DL_FUNC) &_IFC_cpp_replace_non_finite, 2},
     {"_IFC_cpp_computeGamma", (DL_FUNC) &_IFC_cpp_computeGamma, 1},
     {"_IFC_cpp_base64_encode", (DL_FUNC) &_IFC_cpp_base64_encode, 1},
     {"_IFC_cpp_writeBMP", (DL_FUNC) &_IFC_cpp_writeBMP, 1},
@@ -489,7 +744,21 @@ static const R_CallMethodDef CallEntries[] = {
     {"_IFC_cpp_uint32_to_int32", (DL_FUNC) &_IFC_cpp_uint32_to_int32, 1},
     {"_IFC_cpp_int64_to_uint64", (DL_FUNC) &_IFC_cpp_int64_to_uint64, 1},
     {"_IFC_cpp_uint64_to_int64", (DL_FUNC) &_IFC_cpp_uint64_to_int64, 1},
+    {"_IFC_cpp_v_int32_to_uint32", (DL_FUNC) &_IFC_cpp_v_int32_to_uint32, 1},
+    {"_IFC_cpp_v_int64_to_uint64", (DL_FUNC) &_IFC_cpp_v_int64_to_uint64, 1},
     {"_IFC_cpp_scanFirst", (DL_FUNC) &_IFC_cpp_scanFirst, 5},
+    {"_IFC_cpp_fast_factor", (DL_FUNC) &_IFC_cpp_fast_factor, 2},
+    {"_IFC_cpp_group_df", (DL_FUNC) &_IFC_cpp_group_df, 1},
+    {"_IFC_cpp_coord_to_px", (DL_FUNC) &_IFC_cpp_coord_to_px, 3},
+    {"_IFC_cpp_as_nativeRaster", (DL_FUNC) &_IFC_cpp_as_nativeRaster, 1},
+    {"_IFC_cpp_draw", (DL_FUNC) &_IFC_cpp_draw, 6},
+    {"_IFC_cpp_raster", (DL_FUNC) &_IFC_cpp_raster, 4},
+    {"_IFC_cpp_fast_cbind_DF_M", (DL_FUNC) &_IFC_cpp_fast_cbind_DF_M, 3},
+    {"_IFC_cpp_fast_cbind_M_DF", (DL_FUNC) &_IFC_cpp_fast_cbind_M_DF, 3},
+    {"_IFC_cpp_fast_cbind_DF_DF", (DL_FUNC) &_IFC_cpp_fast_cbind_DF_DF, 3},
+    {"_IFC_cpp_fast_cbind_M_M", (DL_FUNC) &_IFC_cpp_fast_cbind_M_M, 3},
+    {"_IFC_cpp_fast_cbind_DF_L", (DL_FUNC) &_IFC_cpp_fast_cbind_DF_L, 3},
+    {"_IFC_cpp_fast_cbind_L_DF", (DL_FUNC) &_IFC_cpp_fast_cbind_L_DF, 3},
     {"_IFC_cpp_crop", (DL_FUNC) &_IFC_cpp_crop, 3},
     {"_IFC_cpp_resize", (DL_FUNC) &_IFC_cpp_resize, 6},
     {"_IFC_cpp_decomp", (DL_FUNC) &_IFC_cpp_decomp, 9},

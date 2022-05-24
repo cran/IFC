@@ -38,17 +38,21 @@
 #' @param fileName path to file.
 #' @param options list of options used to parse FCS file. It should contain:\cr
 #' - header, a list whose members define the "at" offset from header$start$at and the "n" number of bytes to extract:\cr
-#' -- start: where start reading FCS dataset.                  Default is list(at = 0, n = 6),\cr
+#' -- start: where start reading FCS dataset.                  Default is list(at = 0,  n = 6),\cr
 #' -- text_beg: where to retrieve file text segment beginning. Default is list(at = 10, n = 8),\cr
 #' -- text_end: where to retrieve file text segment end.       Default is list(at = 18, n = 8),\cr
 #' -- data_beg: where to retrieve file text segment beginning. Default is list(at = 26, n = 8),\cr
 #' -- data_end: where to retrieve file text segment end.       Default is list(at = 34, n = 8),\cr
-#' - apply_scale, whether to apply data scaling. Default is TRUE\cr
-#' - first_only, whether to extract only first. Default is FALSE
+#' - apply_scale, whether to apply data scaling. It only applies when fcs file is stored as DATATYPE "I". Default is TRUE.\cr
+#' - first_only, whether to extract only the first dataset when several. Default is TRUE.\cr
+#' - force_header, whether to force the use of header to determine the position of data segment. Default is FALSE, for using positions found in "$BEGINDATA" and "$ENDDATA" keywords.\cr
+#' - text_only, whether to only extract text segment. Default is FALSE.
 #' @param display_progress whether to display a progress bar. Default is TRUE.
 #' @param ... other arguments to be passed.
-#' @details 'options' may be tweaked according to file type, instrument and software used to generate it. Default 'options' should allow to read most files.
-#' @source Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \url{https://onlinelibrary.wiley.com/doi/10.1002/cyto.a.20825}.
+#' @details 'options' may be tweaked according to file type, instrument and software used to generate it.\cr
+#' Default 'options' should allow to read most files.\cr
+#' 'apply_scale', 'force_header', 'first_only', and 'textt_only' can also be passed to 'options' thanks to ...
+#' @source Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \doi{10.1002/cyto.a.20825}.
 #' @return a list whose elements are lists for each dataset stored within the file.\cr
 #' each sub-list contains:\cr
 #' - header, list of header information corresponding to 'options'\cr
@@ -62,39 +66,73 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
                                                            data_beg = list(at = 26, n = 8),
                                                            data_end = list(at = 34, n = 8)),
                                              apply_scale = TRUE,
-                                             first_only = TRUE),
+                                             first_only = TRUE,
+                                             force_header = FALSE,
+                                             text_only = FALSE),
                     display_progress = TRUE, ...) {
   dots = list(...)
-  
+  on.exit(gc(verbose = FALSE), add = TRUE)
   if(missing(fileName)) stop("'fileName' can't be missing")
   assert(display_progress, len = 1, alw = c(TRUE,FALSE))
+  assert(fileName, len = 1)
   if(!file.exists(fileName)) stop(paste("can't find",fileName,sep=" "))
   title_progress = basename(fileName)
   
+  # ensure options names are valid
+  if(!identical(sort(names(options)), c("apply_scale", "first_only", "force_header", "header", "text_only"))) stop("'options' should be a named list containing \"header\", \"apply_scale\", \"first_only\", \"force_header\", and \"text_only\" entries")
+  if(!identical(sort(names(options$header)), c("data_beg", "data_end", "start", "text_beg", "text_end"))) stop("'options$header' should be a named list containing \"start\", \"text_beg\", \"text_end\", \"data_beg\", and \"data_end\" entries")
+  if(!(all(sapply(options$header, FUN = function(x) identical(sort(names(x)), c("at","n")))))) stop("each 'options$header' members should be a named list containing \"at\" and \"n\" entries")
+  
+  # ensure start at is valid
+  at = suppressWarnings(as.integer(options$header[["start"]]$at[1]))
+  at = na.omit(at[at >=0 & at < file.size(fileName)])
+  assert(at, len=1)
+  
+  # create connection binary reading
   toread = file(description = fileName, open = "rb")
   on.exit(close(toread), add = TRUE)
   
   # we will read offsets from options
   header = sapply(names(options$header), simplify = FALSE, FUN = function(x) {
-    seek(toread, options$header[[x]]$at[1] + ifelse(x == "start", 0, options$header[["start"]]$at[1]))
-    raw = rawToChar(readBin(toread, what = "raw", n = options$header[[x]]$n))
-    if(x != "start") raw = suppressWarnings(na.omit(as.integer(raw)) + options$header[["start"]]$at[1])
+    seek(toread, options$header[[x]]$at[1] + ifelse(x == "start", 0, at))
+    raw = trimws(x = rawToChar(readBin(toread, what = "raw", n = options$header[[x]]$n)))
+    if(x != "start") raw = suppressWarnings(na.omit(as.integer(raw) + at))
     raw
   })
+  
+  # FIXME, should we validate each header entry ?
+  # e.g. header$start == FCSx.x
+  # and so on ...
+  
+  # check if we can find options arguments in dots
+  if("text_only" %in% names(dots)) options$text_only <- dots$text_only
+  if("first_only" %in% names(dots)) options$first_only <- dots$first_only
+  if("apply_scale" %in% names(dots)) options$apply_scale <- dots$apply_scale
+  if("force_header" %in% names(dots)) options$force_header <- dots$force_header
+  assert(options[["text_only"]], len = 1, alw = c(TRUE, FALSE))
+  assert(options[["first_only"]], len = 1, alw = c(TRUE, FALSE))
+  assert(options[["apply_scale"]], len = 1, alw = c(TRUE, FALSE))
+  assert(options[["force_header"]], len = 1, alw = c(TRUE, FALSE))
+  
   # now we can extract text segment,
-  # the primary text segment has to be in  within bytes 58 - 99,999,999
+  # the primary text segment has to be in within bytes 58 - 99,999,999
   off1 = header$text_beg
   off2 = header$text_end
   seek(toread, off1)
   # first byte of text segment has to be the delimiter
   delimiter = rawToChar(readBin(toread, what = "raw", n = 1))
-  text = rawToChar(readBin(toread, what = "raw", n = abs(off2 - off1)))
+  text = rawToChar(readBin(toread, what = "raw", n = off2 - off1))
   # when same character as delimiter is used within keyword-value pair it has to be escaped (repeated twice)
   # we generate a 20 random characters delim_esc that does not contain delimiter
-  delim_esc = random_name(n = 20)
-  delim_esc = strsplit(x = delim_esc, split = delimiter, fixed = TRUE)[[1]]
-  delim_esc = delim_esc[delim_esc!=""]
-  delim_esc = paste0(delim_esc, collapse="")
+  # we also ensure that this delim is not found elsewhere in the file
+  found = 1
+  while(found) {
+    delim_esc = random_name(n = 20)
+    delim_esc = strsplit(x = delim_esc, split = delimiter, fixed = TRUE)[[1]]
+    delim_esc = delim_esc[delim_esc!=""]
+    delim_esc = paste0(delim_esc, collapse="")
+    found = cpp_scanFirst(fileName, charToRaw(delim_esc))
+  }
   # we 1st look at double delimiter instance and substitute it with delim_esc 
   text = gsub(pattern = paste0(delimiter,delimiter), replacement = delim_esc, x = text, fixed = TRUE)
   # then text is split with delimiter
@@ -107,48 +145,72 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
   id_val = seq(from = 2, to = length(text), by = 2)
   id_key = id_val-1
   text = structure(as.list(text[id_val]), names = text[id_key])
+  
   # now we can extract additional text segment
   # we will use text to extract supplemental text segment offsets
-  extra_off1 = suppressWarnings(as.integer(text[["$BEGINSTEXT"]])) + options$header[["start"]]$at[1]
-  extra_off2 = suppressWarnings(as.integer(text[["$ENDSTEXT"]])) + options$header[["start"]]$at[1]
+  extra_off1 = suppressWarnings(na.omit(as.integer(text[["$BEGINSTEXT"]]) + at))
+  extra_off2 = suppressWarnings(na.omit(as.integer(text[["$ENDSTEXT"]])   + at))
   if((length(extra_off1) != 0) &&
      (length(extra_off2) != 0) &&
-     !(extra_off1 == off1 && extra_off2 == off2) 
-     && (extra_off2 != extra_off1)) {
+     (extra_off1 != off1) && 
+     (extra_off2 != off2) &&
+     (extra_off2 > extra_off1)) {
     # we apply same process as for previously (see text segment)
     seek(toread, extra_off1)
-    extra_text = rawToChar(readBin(toread, what = "raw", n = abs(extra_off2 - extra_off1)))
-    extra_text = gsub(pattern = paste0(delimiter,delimiter), replacement = delim_esc, x = extra_text, fixed = TRUE)
-    extra_text = strsplit(x = extra_text, split = delimiter, fixed = TRUE)[[1]]
-    while(trimws(extra_text[1]) == "") { extra_text = extra_text[-1] }
-    extra_text = gsub(pattern = delim_esc, replacement = delimiter, x = extra_text, fixed = TRUE)
-    id_val = seq(from = 2, to = length(extra_text), by = 2)
-    id_key = id_val-1
-    extra_text = structure(as.list(extra_text[id_val]), names = extra_text[id_key])
-    text = c(text, extra_text)
+    text_bck = text
+    tryCatch({
+      extra_text = rawToChar(readBin(toread, what = "raw", n = extra_off2 - extra_off1))
+      extra_text = gsub(pattern = paste0(delimiter,delimiter), replacement = delim_esc, x = extra_text, fixed = TRUE)
+      extra_text = strsplit(x = extra_text, split = delimiter, fixed = TRUE)[[1]]
+      while(trimws(extra_text[1]) == "") { extra_text = extra_text[-1] }
+      extra_text = gsub(pattern = delim_esc, replacement = delimiter, x = extra_text, fixed = TRUE)
+      id_val = seq(from = 2, to = length(extra_text), by = 2)
+      id_key = id_val-1
+      extra_text = structure(as.list(extra_text[id_val]), names = extra_text[id_key])
+      tmp = names(extra_text) %in% names(text)
+      if(any(tmp)) warning("supplemental text segment contains keyword(s) already found in text", call. = FALSE, immediate. = TRUE)
+      text = c(text, extra_text[!tmp])
+    }, error = function(e) {
+      text = text_bck
+      warning("supplemental text segment is not readable:\n", e$message, call. = FALSE, immediate. = TRUE)
+    })
   }
+  
+  if(!any("$FIL" == names(text))) text[["$FIL"]] <- fileName
+  text[["@IFC_file"]] <- basename(text[["$FIL"]]) # internal filename if found, otherwise fileName
+  text[["@IFC_fileName"]] <- fileName
+  text[["@IFC_dataset"]] <- length(options$header$start$at)
+  text[["@IFC_version"]] <- paste0(unlist(packageVersion("IFC")), collapse = ".")
+  text[["@IFC_FCSversion"]] <- header$start
   
   # now we can extract data segment
   # we will use text to extract data segment offsets
-  off1 = suppressWarnings(na.omit(as.integer(text[["$BEGINDATA"]]))) + options$header[["start"]]$at[1]
-  off2 = suppressWarnings(na.omit(as.integer(text[["$ENDDATA"]]))) + options$header[["start"]]$at[1]
+  off1 = suppressWarnings(na.omit(as.integer(text[["$BEGINDATA"]]) + at))
+  off2 = suppressWarnings(na.omit(as.integer(text[["$ENDDATA"]])   + at))
   # if not found in text despite being mandatory, we will use header
   if(length(off1) == 0) off1 = header$data_beg
   if(length(off2) == 0) off2 = header$data_end
-
-  data_bytes = abs(off2- off1) + 1
+  if(options$force_header) {
+    if(any(c(header$data_beg, header$data_end, length(header$data_beg), length(header$data_end)) == 0)) {
+      warning("can't 'force_header' because header data offset is 0", call. = FALSE, immediate. = TRUE)
+    } else {
+      off1 = header$data_beg
+      off2 = header$data_end
+    }
+  }
+  data_bytes = off2 - off1 + 1
   # prepare default returned value for data
   data = data.frame()
-  if(off2 != off1) {
+  if(!options$text_only && (off2 > off1)) {
     seek(toread, off1)
     # retrieve info to extract data
     type = text[["$DATATYPE"]]
     if(!(type %in% c("A","I","F","D"))) stop("non-compatible data type:", type)
     mode = text[["$MODE"]]
-    if(mode != "L") stop("data stored in mode[",mode,"] are not supported")
+    if(mode != "L") stop("data stored in mode[",mode,"] are not supported") # mode "C" and "U" have been deprecated in FCS spe
     n_obj = as.integer(text[["$TOT"]])
     n_par = as.integer(text[["$PAR"]])
-    features_names = grep("^\\$P\\d*N$", names(text), value = TRUE)
+    features_names = grep("^\\$P\\d.*N$", names(text), value = TRUE)
     
     # hereafter we create several bit_* variables
     # bit_v : PnB, bits depth of the value
@@ -200,133 +262,200 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
       if((data_bytes %% 8) %% 2) data_bytes = data_bytes - 1
       if((data_bytes %% 8) %% 2) stop("number of data bytes does not respect fcs specification")
       
-      # extract order
-      # it is not clear from FCS spe if type == "I" can be 8, 16, 32 or 64,
-      # so we choose to use byte order as the most trustable parameter to define number of bytes to extract (bit_n and bit_d)
-      # however it is clearly mentioned that "F" has to be 32 and "D" 64 so we throw an error it if byteorder does not match
+      # extract order, endianness
       b_ord = text[["$BYTEORD"]]
       bit_o = as.integer(strsplit(b_ord, split=",", fixed=TRUE)[[1]])
-      bit_n = length(bit_o) 
       b_ord = paste0(bit_o, collapse = ",")
       
+      # determines endianness of the file
       endian = "unk"
-      endian_l = paste0(1:bit_n, collapse = ",")
-      endian_b = paste0(bit_n:1, collapse = ",")
-      bit_d = 8 * bit_n
-      args = list(what = "numeric", size = bit_n)
+      endian_l = paste0(1:length(bit_o), collapse = ",")
+      endian_b = paste0(length(bit_o):1, collapse = ",")
+      if(endian_l == b_ord) endian = "little"
+      if(endian_b == b_ord) endian = "big"
       
-      # here we correct data_length, if needed
-      if(n_obj * n_par * bit_n != data_bytes) warning("number of data bytes have been corrected", call. = FALSE, immediate. = TRUE)
-      data_bytes = n_obj * n_par * bit_n
-      if((data_bytes + off1) > file.size(fileName)) stop("data length points to outside of file")
+      # register bit_v values
+      bit_v_back = bit_v
+      
+      # try bit_v correction
+      alw_b = 2^(1:6) # 2,4,8,16,32,64, sizes handled by R
+      bit_corrected = FALSE
+      if(any(!(bit_v %in% alw_b))) {
+        bit_corrected = TRUE
+        bit_v = sapply(bit_v, FUN = function(x) alw_b[x <= alw_b][1])
+      }
+      bit_n = unname(bit_v %/% 8)
+      
+      # try data_length correction and check accuracy of bit_v correction, if any
+      if(sum(n_obj * bit_n) != data_bytes) { # data_length is not OK
+        if(bit_corrected) {                  # bit_v was already corrected
+          bit_v = bit_v_back
+          bit_n = unname(bit_v %/% 8)
+          bit_corrected = FALSE
+          if(sum(n_obj*bit_n)!=data_bytes) { # bit_v is reverted but data_length still does not match
+            stop("can't determine bit depth and data length")
+          }
+        } else {                             # bit_v was not corrected, we apply data_length correction
+          data_bytes = sum(n_obj * bit_n)
+          warning("number of data bytes have been corrected", call. = FALSE, immediate. = TRUE)
+        }
+      } else {                               # data_length is OK
+        if(bit_corrected)             {      # check if bit_v was corrected to show a warning
+          warning("bits depth have been corrected to next allowed value", call. = FALSE, immediate. = TRUE)
+        }
+      }
+      bit_d = unique(bit_v)
       
       if(type == "I") { 
-        # with readBin unsigned integer can only be extracted for 8bits and 16bits. So, 
-        # for 32bits and 64bits we have to extract signed integers and convert them afterwards
-        args = list(what = "integer", size = bit_n, signed = bit_n > 2)
-        # force bits depth, shall never be > bit_d
-        tmp = bit_v > bit_d
-        if(any(tmp)) {
-          warning(paste0("some 'PnB' keyword(s) has been forced to ", bit_d, ":\n",
-                                    paste0(paste0("\t- ", names(bit_v)[tmp]), collapse = "\n")), call. = FALSE, immediate. = TRUE)
-          for(i in names(bit_v)[tmp]) text[[i]] <- as.character(bit_d)
-        }
-        bit_v[tmp] <- bit_d
+        # FIXME it is not clear how to perform tightbit packing bit_p = xxxxx
         
-        # it is not clear how to perform tightbit packing
-        # bit_p = xxxxx
+        # setup readBin parameters for each channels
+        args = sapply(bit_n, simplify = FALSE, USE.NAMES = TRUE, FUN = function(x)  list(what = "integer", size = x, signed = x > 2))
         
         # compute bit mask
-        bit_r = sapply(text[paste0("$P",1:n_par,"R")], FUN = function(x) suppressWarnings(ceiling(log2(as.integer(x)))))
-        bit_m = unlist(lapply(1:n_par, FUN = function(i_par) packBits(as.raw(sapply(1:bit_d, FUN = function(i) i <= min(bit_r[i_par],bit_v[i_par]))))))
+        bit_r = sapply(text[paste0("$P",1:n_par,"R")], FUN = function(x) suppressWarnings(ceiling(log2(as.numeric(x))))) # as.integer("4294967296") results in NA so we use as.numeric
+        bit_m = lapply(1:n_par, FUN = function(i_par) packBits(as.raw(sapply(1:bit_v[i_par], FUN = function(i) i <= min(bit_r[i_par],bit_v[i_par])))))
       } else {
-        if(bit_d != ifelse(type == "F", 32L, 64L)) stop("mismatch between bytes order and bits depth")
+        # fcs specification mention:
+        # besides PnB for types "F" and "D" have to be 32 or 64, respectively.
+        bit_d == rep(ifelse(type == "F", 32L, 64L), n_par)
+        
         # force bits depth, shall always be max allowed depth
         tmp = bit_v != bit_d
         if(any(tmp)) {
           warning(paste0("some 'PnB' keyword(s) has been forced to ", bit_d, ":\n",
-                                    paste0(paste0("\t- ", names(bit_v)[tmp]), collapse = "\n")), call. = FALSE, immediate. = TRUE)
+                         paste0(paste0("\t- ", names(bit_v)[tmp]), collapse = "\n")), call. = FALSE, immediate. = TRUE)
           for(i in names(bit_v)[tmp]) text[[i]] <- as.character(bit_d)
         }
-        bit_v <- bit_d 
+        bit_v <- bit_d
+        
+        # fcs specification mention:
+        # `No bit mask shall be applied when reading type "F" or "D" data`
+        # So, bit_r is set to bit_d to prevent masking
+        # FIXME, however what to do with PnR in type "F" or "D", shall we truncate ?
+        # fcs specification mention:
+        # `The actual value stored in the data set may exceed this range on both sides of 
+        #  the interval. Specifically, there may be negative values as well as values greater than n1, e.g., as 
+        #  a consequence of compensation``
         bit_r <- bit_d
         bit_m = NULL
+        
+        # setup readBin parameters for each channels
+        args = sapply(bit_n, simplify = FALSE, USE.NAMES = TRUE, FUN = function(x)  list(what = "numeric", size = x))
       }
-      if(endian_l == b_ord) endian = "little"
-      if(endian_b == b_ord) endian = "big"
       
-      if((endian != "unk") && all(bit_r == bit_d)) {
-        # for type == "I" we are forced to apply bit masking if a PnR is not equal to bit_d
-        data = do.call(what = readBin, args = c(list(con = toread, endian = endian, n = data_bytes / args$size), args))
-      } else { 
-        # create bit mask and order vector for all parameters
-        bit_o = c(outer(bit_o, seq(from = 0, to = args$size * (n_par - 1), by = args$size), `+`))
-        if(length(bit_m) != 0) # no bit_m for type F nor D
-          if(length(bit_o) != length(bit_m)) stop("mismatch beetween bit order and bit mask")
-        # applying bit ordering and masking is time-consuming
+      # check data_length before starting reading
+      if((data_bytes + off1) > file.size(fileName)) stop("data length points to outside of file")
+      
+      
+      # fcs specifications mention that type "I" use unsigned integers only
+      # but readBin can only extracts 8bits and 16bits unsigned integer. So, 
+      # for 32bits and 64bits we have to extract signed integers and convert them afterwards
+      # with cpp_v_intxx_to_uintxx functions
+      if((endian != "unk") &&              # endianness is either "little" or "big" and can be passed to readBin without reordering
+         (length(bit_d) == 1) &&           # every channels have same bits depth
+         (bit_d %in% c(2,4,8,16,32,64))) { # bits depth is a size handled by R
+        if(all(bit_r == bit_d)) {          # there is no masking to apply
+          data = do.call(args = c(list(con = toread, 
+                                       endian = endian, 
+                                       n = data_bytes / args[[1]]$size),
+                                  args[[1]]),
+                         what = readBin)
+        } else { # we are forced to apply bit masking if a PnR is not equal to bit_d
+          # extract order for the whole data
+          ord_ = cpp_get_bytes_order(n_obj, bit_n, bit_o, endian_b == b_ord)
+          # extract mask for the whole data
+          msk_ = rep(unlist(bit_m), n_obj)
+          # extract the whole data in "raw"
+          data = readBin(con = toread, what = "raw", n = data_bytes)
+          # process data according to args, order and mask and make the conversion
+          data = do.call(args = c(list(con = data[ord_] & msk_,
+                                       endian = "little",
+                                       n = data_bytes / args[[1]]$size),
+                                  args[[1]]),
+                         what = readBin)
+        }
+        # convert to unsigned integers if needed
+        if(type == "I") {
+          if(args[[1]]$size == 4) data = cpp_v_int32_to_uint32(data)
+          if(args[[1]]$size == 8) data = cpp_v_int64_to_uint64(data)
+        }
+        data = matrix(data, ncol = n_par, nrow = n_obj, byrow = TRUE)
+      } else {
+        # extract order for the whole data
+        ord_ = cpp_get_bytes_order(n_obj, bit_n, bit_o, endian_b == b_ord)
+        # extract mask for the whole data
+        msk_ = rep(unlist(bit_m), n_obj)
+        # define grouping parameter for the whole data
+        spl_ = rep(unlist(mapply(FUN = rep, 1:length(bit_n), bit_n, SIMPLIFY = FALSE)), times = n_obj)
+        
         if(display_progress) {
           lab = sprintf("data-type[%s]: extracting values", type)
-          pb = newPB(session = dots$session, min = 0, max = n_obj, initial = 0, style = 3)
-          tryCatch({
-            if(length(bit_m) == 0) {
-              data = sapply(1:n_obj, FUN = function(i_obj) {
-                setPB(pb, value = i_obj, title = title_progress, label = lab)
-                do.call(what = readBin, args = c(list(endian = "little", n = n_par, 
-                                                      con = readBin(toread, what = "raw", n = n_par * args$size)[bit_o]), args))
-              })
-            } else {
-              data = sapply(1:n_obj, FUN = function(i_obj) {
-                setPB(pb, value = i_obj, title = title_progress, label = lab)
-                do.call(what = readBin, args = c(list(endian = "little", n = n_par, 
-                                                      con = readBin(toread, what = "raw", n = n_par * args$size)[bit_o] & bit_m), args))
-              })
-            }
-          }, finally = endPB(pb))
-        } else {
-          if(length(bit_m) == 0) {
-            data = sapply(1:n_obj, FUN = function(i_obj) {
-              do.call(what = readBin, args = c(list(endian = "little", n = n_par, 
-                                                    con = readBin(toread, what = "raw", n = n_par * args$size)[bit_o]), args))
-            })
-          } else {
-            data = sapply(1:n_obj, FUN = function(i_obj) {
-              do.call(what = readBin, args = c(list(endian = "little", n = n_par, 
-                                                    con = readBin(toread, what = "raw", n = n_par * args$size)[bit_o] & bit_m), args))
-            })
+          pb = newPB(session = dots$session, min = 0, max = n_par, initial = 0, style = 3)
+          on.exit(endPB(pb), add = TRUE)
+        }
+        
+        # extract the whole data in "raw"
+        data = readBin(con = toread, what = "raw", n = data_bytes)
+        # process data according to args, order and mask and make the conversion
+        data = unlist(by(list(v = data[ord_] & msk_, split = spl_), spl_, FUN = function(x) {
+          i_par = x$split[1]
+          if(display_progress) setPB(pb, value = i_par, title = title_progress, label = lab)
+          if(args[[i_par]]$size %in% c(3,5,6,7)) { # for sizes not handled by R 
+            M = c(1,2,4,8)[args[[i_par]]$size <= c(1,2,4,8)][1]
+            m = M - args[[i_par]]$size
+            bar = split(x$v,ceiling(seq_along(x$v)/args[[i_par]]$size))
+            bar = lapply(bar, FUN = function(i) c(i, rep(as.raw(0x00), m)))
+            foo = readBin(con = unlist(bar),
+                          endian = "little",
+                          what = args[[i_par]]$what,
+                          n = n_obj,
+                          size = M,
+                          signed = TRUE)
+          } else { # size is handled by R
+            foo = readBin(con = x$v,
+                          endian = "little",
+                          what = args[[i_par]]$what,
+                          n = n_obj,
+                          size = args[[i_par]]$size,
+                          signed = args[[i_par]]$signed)
           }
-        } 
-      } 
-    }
-    if(type == "I") { # for 32bits and 64bits integers we need to convert signed to unsigned
-      if(bit_n == 4) data = as.integer(sapply(c(data), cpp_int32_to_uint32))
-      if(bit_n == 8) data = as.integer(sapply(c(data), cpp_int64_to_uint64))
+          # convert to unsigned integers if needed
+          if(type == "I") {
+            if(args[[i_par]]$size == 4) return(cpp_v_int32_to_uint32(foo))
+            if(args[[i_par]]$size == 8) return(cpp_v_int64_to_uint64(foo))
+          }
+          foo
+        }))
+        data = matrix(data, ncol = n_par, nrow = n_obj, byrow = FALSE)
+      }
     }
     
     # convert data to data.frame
-    data = matrix(data, ncol = n_par, nrow = n_obj, byrow = TRUE)
-    
-    feat_names = unlist(text[paste0("$P",1:n_par,"N")])
-    feat_alt = unlist(text[paste0("$P",1:n_par,"S")])
-    if(length(feat_names) == length(feat_alt)) {
-      if(!identical(unname(feat_names), unname(feat_alt))) {
-        feat_names = paste(feat_names ,paste0("< ",feat_alt," >"))
-      }
-    }
+    feat_names = NULL
+    if(n_par > 0) feat_names = sapply(1:n_par, FUN = function(i) {
+      N = text[[paste0("$P",i,"N")]]
+      S = text[[paste0("$P",i,"S")]]
+      if(length(S) != 0) return(paste(N , paste0("< ",S," >")))
+      return(N)
+    })
     data = structure(data.frame(data, check.names = FALSE), names = feat_names)
     
-    # scale data
-    if(options$apply_scale) {
+    # scale data only for type I, ISAC spe mentions:
+    # When linear scale is used, $PnE/0,0/ shall be entered if the floating point data type is used i.e. "F" or "D"
+    # meaning that no scaling shall be used for type "F" and "D". Besides type "A" is deprecated
+    if(options$apply_scale && (type == "I") && (n_par > 0)) {
       sapply(1:n_par, FUN = function(i) {
         PnE = paste0("$P",i,"E")
         PnR = paste0("$P",i,"R")
         trans = text[[PnE]]
-        ran = as.numeric(text[[PnR]])
-        if((length(trans) == 0 )|| (length(ran) == 0)) return(NULL) # no scaling info
-        trans = as.numeric(strsplit(trans, split = ",", fixed = TRUE)[[1]])
-        if(any(trans == 0)) return(NULL)
-        data[,i] <<- (10^((data[,i]/ran) * trans[1]) * trans[2])
-        text[[PnE]] <<- "0,0"
-        text[[PnR]] <<- as.character(ceiling(max(data[,i], na.rm = TRUE)))
+        ran = na.omit(as.numeric(text[[PnR]]))
+        # FIXME should we warn user when scaling values are not valid ?
+        if((length(trans) == 0) || (length(ran) == 0)) return(NULL) # no scaling info
+        trans = na.omit(as.numeric(strsplit(trans, split = ",", fixed = TRUE)[[1]]))
+        if(length(trans) != 2 || trans[1] == 0) return(NULL) # invalid PnE info
+        if(trans[2] == 0) trans[2] <- 1                      # invalid PnE info
+        data[,i] <<- 10^(trans[1] * data[,i] / ran) * trans[2]
         return(NULL)
       })
     }
@@ -347,26 +476,211 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
                   text=text, 
                   data=data))
   
-  # extract additionnal FCS set if any
+  # extract additional FCS set if any
   more = integer()
-  if(!options$first_only) more = suppressWarnings(na.omit(as.integer(text[["$NEXTDATA"]]))) + options$header[["start"]]$at[1]
+  if(!options$first_only) more = suppressWarnings(na.omit(as.integer(text[["$NEXTDATA"]]) + at))
   if((length(more) != 0) && !(more %in% options$header$start$at)) {
-    options$header$start$at <- c(more, options$header$start$at)
-    ans = c(ans, readFCS(fileName = fileName, options = options,
-                         display_progress = display_progress, ...))
+    if(more < file.size(fileName)) {
+      options$header$start$at <- c(more, options$header$start$at)
+      ans = c(ans, readFCS(fileName = fileName, options = options,
+                           display_progress = display_progress, ...))
+    } else {
+      warning("can't extract all datasets: keyword $NEXTDATA points to outside of the file")
+    }
   }
-  return(ans)
+  return(structure(ans, class = "IFC_fcs", fileName = fileName))
 }
 
-#' @title FCS File Reader
+#' @title FCS Object Data Sets Merging
 #' @description
-#' Extracts data from Flow Cytometry Standard (FCS) Files.
-#' @param fileName path(s) of file(s). If multiple files are provided they will be merged and 
-#' populations will be created to identify each single file within returned `IFC_data` object.
-#' @source Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \url{https://onlinelibrary.wiley.com/doi/10.1002/cyto.a.20825}.
-#' @param ... other arguments to be passed to readFCS function.
+#' Merges FCS data object with various data sets.
+#' @param fcs `IFC_fcs` object as extracted by readFCS().
+#' @param ... other arguments to be passed.
+#' @details in data can contain extra columns named 'import_file' and 'import_subfile' intended to allow file/dataset identification
+#' @return a list of list containing:\cr
+#' - header, list of header information corresponding to 'options'\cr
+#' - delimiter, unique character used to separate keyword - values\cr
+#' - text, list of keywords values,\cr
+#' - data, data.frame of values.
+#' @keywords internal
+FCS_merge_dataset <- function(fcs, ...) {
+  dots = list(...)
+  on.exit(gc(verbose = FALSE), add = TRUE)
+  display_progress = dots$display_progress
+  if(length(display_progress) == 0) display_progress = TRUE
+  assert(display_progress, len=1, alw = c(TRUE, FALSE))
+  
+  L = length(fcs)
+  if(L > 1) {
+    if(display_progress) {
+      pb = newPB(session = dots$session, label = "FCS", min = 0, max = L)
+      on.exit(endPB(pb))
+    }
+    features = Reduce(function(x, y) {
+      Nx = names(x)
+      Ny = names(y)
+      com <- Nx[Nx %in% Ny]
+      Nxx <- Nx[!Nx %in% Ny]
+      Nyy <- Ny[!Ny %in% Nx]
+      xx = x[, Nxx, drop = FALSE]
+      xx = cbind.data.frame(xx, matrix(NA, nrow = nrow(xx), ncol = length(Nyy)))
+      names(xx) = c(Nxx, Nyy)
+      yy = y[, Nyy, drop = FALSE]
+      yy = cbind.data.frame(yy, matrix(NA, nrow = nrow(yy), ncol = length(Nxx)))
+      names(yy) = c(Nyy, Nxx)
+      aa = rbind.data.frame(xx[, c(Nxx, Nyy), drop = FALSE], yy[, c(Nxx, Nyy), drop = FALSE], make.row.names = FALSE)
+      if(length(com) != 0) {
+        if(length(c(Nxx, Nyy)) == 0) {
+          aa = structure(rbind.data.frame(x[, com, drop = FALSE],
+                                          y[, com, drop = FALSE],
+                                          make.row.names = FALSE),
+                         names = com)
+        } else {
+          aa = structure(cbind.data.frame(aa, rbind.data.frame(x[, com, drop = FALSE],
+                                                               y[, com, drop = FALSE],
+                                                               make.row.names = FALSE)),
+                         names = c(Nxx, Nyy, com))
+        }
+      }
+      aa
+    },
+    lapply(1:L, FUN = function(i) {
+      if(display_progress) setPB(pb, value = i, title = "FCS", label = "Merging Data Sets")
+      dat = fcs[[i]]$data
+      if(!any("import_file" == names(dat))) {
+        dat[,"import_file"]=rep(fcs[[i]]$text[["@IFC_file"]], nrow(dat))
+        # dat = cbind.data.frame(dat, "import_file"=rep(fcs[[i]]$text[["@IFC_file"]], nrow(dat)))
+      }
+      if(!any("import_subfile" == names(dat))) {
+        dat[,"import_subfile"]=rep(fcs[[i]]$text[["@IFC_dataset"]], nrow(dat))
+        # dat = cbind.data.frame(dat, "import_subfile"=rep(fcs[[i]]$text[["@IFC_dataset"]], nrow(dat)))
+      }
+      dat
+    }))
+  } else {
+    features = fcs[[1]]$data
+    if(!any("import_file" == names(features))) {
+      features[,"import_file"]=rep(fcs[[1]]$text[["@IFC_file"]], nrow(features))
+      # features = cbind.data.frame(features, "import_file"=rep(fcs[[1]]$text[["@IFC_file"]], nrow(features)))
+    }
+    if(!any("import_subfile" == names(features))) {
+      features[,"import_subfile"]=rep(1, nrow(features))
+      # features = cbind.data.frame(features, "import_subfile"=rep(1, nrow(features)))
+    }
+  }
+  
+  ans = list(list(header=fcs[[1]]$header,
+                  delimiter=fcs[[1]]$delimiter,
+                  text=fcs[[1]]$text, 
+                  data = features))
+  class(ans) <- "IFC_fcs"
+  attr(ans, "fileName") <- attr(fcs, "fileName")
+  bar <- unique(features[, "import_file"])
+  if(length(bar) > 1) attr(ans, "Merged_fcs") <- bar
+  ans
+}
+
+#' @title FCS Object Samples Merging
+#' @description
+#' Merges FCS data object with various samples.
+#' @param fcs `IFC_fcs` object as extracted by readFCS().
+#' @param ... other arguments to be passed.
+#' @details in data can contain extra columns named 'import_file' and 'import_subfile' intended to allow file/dataset identification
+#' @return a list of list containing:\cr
+#' - header, list of header information corresponding to 'options'\cr
+#' - delimiter, unique character used to separate keyword - values\cr
+#' - text, list of keywords values,\cr
+#' - data, data.frame of values.
+#' @keywords internal
+FCS_merge_sample <- function(fcs, ...) {
+  dots = list(...)
+  on.exit(gc(verbose = FALSE), add = TRUE)
+  display_progress = dots$display_progress
+  if(length(display_progress) == 0) display_progress = TRUE
+  assert(display_progress, len=1, alw = c(TRUE, FALSE))
+  
+  L = length(fcs)
+  if(L > 1) {
+    if(display_progress) {
+      pb = newPB(session = dots$session, label = "FCS", min = 0, max = L)
+      on.exit(endPB(pb))
+    }
+    features = Reduce(function(x, y) {
+      Nx = names(x)
+      Ny = names(y)
+      # FIXME should we add a check_names argument to ensure that each fcs sample have exactly the same names ?
+      if(sum(nchar(Nx)) > sum(nchar(Ny))) {N = Nx} else {N = Ny}
+      names(x) = N
+      names(y) = N
+      rbind.data.frame(x, y, make.row.names = FALSE)
+    },
+    lapply(1:L, FUN = function(i) {
+      if(display_progress) setPB(pb, value = i, title = "FCS", label = "Merging Samples")
+      dat = fcs[[i]]$data
+      if(!any("import_file" == names(dat))) {
+        dat[,"import_file"]=rep(fcs[[i]]$text[["@IFC_file"]], nrow(dat))
+        # dat = cbind.data.frame(dat, "import_file"=rep(fcs[[i]]$text[["@IFC_file"]], nrow(dat)))
+      }
+      if(!any("import_subfile" == names(dat))) {
+        dat[,"import_subfile"]=rep(fcs[[i]]$text[["@IFC_dataset"]], nrow(dat))
+        # dat = cbind.data.frame(dat, "import_subfile"=rep(fcs[[i]]$text[["@IFC_dataset"]], nrow(dat)))
+      }
+      dat
+    }))
+  } else {
+    features = fcs[[1]]$data
+    if(!any("import_file" == names(features))) {
+      features[,"import_file"]=rep(fcs[[1]]$text[["@IFC_file"]], nrow(features))
+      # features = cbind.data.frame(features, "import_file"=rep(fcs[[1]]$text[["@IFC_file"]], nrow(features)))
+    }
+    if(!any("import_subfile" == names(features))) {
+      features[,"import_subfile"]=rep(1, nrow(features))
+      # features = cbind.data.frame(features, "import_subfile"=rep(1, nrow(features)))
+    }
+  }
+  
+  ans = list(list(header=fcs[[1]]$header,
+                  delimiter=fcs[[1]]$delimiter,
+                  text=fcs[[1]]$text, 
+                  data = features))
+  class(ans) <- "IFC_fcs"
+  attr(ans, "fileName") <- attr(fcs, "fileName")
+  bar <- unique(features[, "import_file"])
+  if(length(bar) > 1) attr(ans, "Merged_fcs") <- bar
+  ans
+}
+
+#' @title Spillover Converter
+#' @description
+#' Converts spillover matrix to spillover keyword and reversely
+#' @param spillover either a spillover matrix or a spillover keyword
+#' @return if 'spillover' is a matrix, it returns a string. If 'spillover' is a string, it returns a matrix. In all cases if spillover is of length 0, it will return NULL.
+#' @keywords internal
+convert_spillover <- function(spillover) {
+  if(length(spillover) == 0) return(NULL)
+  if(is.matrix(spillover)) {
+    if(length(rownames(spillover)) == 0) stop("'spillover' should have rownames")
+    feat_n = parseFCSname(rownames(spillover))
+    return(paste(ncol(spillover), paste0(feat_n$PnN, collapse=","), paste0(as.vector(spillover), collapse=","), sep=","))
+  } else {
+    foo = strsplit(spillover, split=",", fixed=TRUE)[[1]]
+    feat_l = as.integer(foo[1])
+    feat_n = foo[2:(feat_l+1)]
+    vals = foo[-(1:(feat_l+1))]
+    if(length(vals) != feat_l^2) stop("'spillover' keyword does not fulfill fcs specifications")
+    return(matrix(as.numeric(vals), ncol=feat_l, nrow=feat_l, dimnames=list(NULL, feat_n)))
+  }
+}
+
+#' @title FCS Object Converter
+#' @description
+#' Converts FCS data object to `IFC_data` object.
+#' @param fcs `IFC_fcs` object as extracted by readFCS().
+#' @param ... other arguments to be passed.
+#' @details in data can contain extra columns named 'import_file' and 'import_subfile' intended to allow file/dataset identification
 #' @return A named list of class `IFC_data`, whose members are:\cr
 #' -description, a list of descriptive information,\cr
+#' -Merged_fcs, character vector of path of files used to create fcs, if input was a merged,\cr
 #' -fileName, path of fileName input,\cr
 #' -fileName_image, path of .cif image fileName is referring to,\cr
 #' -features, a data.frame of features,\cr
@@ -378,20 +692,21 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
 #' -offsets, an integer vector of images and masks IFDs offsets,\cr
 #' -stats, a data.frame describing populations count and percentage to parent and total population,\cr
 #' -checksum, a checksum integer.
-#' @export
-ExtractFromFCS <- function(fileName, ...) {
+#' @keywords internal
+FCS_to_data <- function(fcs, ...) {
   # create structure
   dots = list(...)
+  on.exit(gc(verbose = FALSE), add = TRUE)
   display_progress = dots$display_progress
   if(length(display_progress) == 0) display_progress = TRUE
   assert(display_progress, len=1, alw = c(TRUE, FALSE))
-  fileName = normalizePath(path = fileName, winslash = "/")
   min_data = list("description" = list("Assay" = data.frame("date" = NULL, "IDEAS_version" = NULL, "binaryfeatures" = NULL),
                                        "ID" = data.frame("file" = NULL, "creation" = NULL, "objcount" = NULL, "checksum" = NULL),
                                        "Images" = data.frame("name" = NULL, "color" = NULL, "physicalChannel" = NULL, "xmin" = NULL,
                                                              "xmax" = NULL, "xmid" = NULL, "ymid"= NULL, "scalemin"= NULL, "scalemax"= NULL,
                                                              "tokens"= NULL, "baseimage"= NULL, "function"= NULL),
                                        "masks" = data.frame()),
+                  "Merged_fcs" = character(),
                   "fileName" = character(),
                   "fileName_image" = character(),
                   "features" = structure(.Data = list(), class = c("data.frame", "IFC_features")),
@@ -408,52 +723,12 @@ ExtractFromFCS <- function(fileName, ...) {
   # define features categories which requires no param
   No_Param = c("Time", "Object Number", "Raw Centroid X", "Raw Centroid Y",  "Flow Speed", "Camera Line Number", "Camera Timer", "Objects per mL", "Objects per sec")
   
-  # read the fcs file and extract features and description
-  L = length(fileName)
-  if(display_progress) pb = newPB(session = dots$session, label = "reading files", min = 0, max = L)
-  tryCatch({
-    fcs = lapply(1:L, FUN = function(i_file) {
-      if(display_progress) setPB(pb, value = i_file, title = "Extracting FCS", label = "reading files")
-      foo = readFCS(fileName = fileName[[i_file]], ...)
-      dat = lapply(1:length(foo), FUN = function(i) {
-        df = data.frame(foo[[i]]$data, stringsAsFactors = FALSE, check.names = FALSE)
-        df$import_file = basename(fileName[[i_file]])
-        df$import_subfile = sprintf("dataset_%03i", i)
-        return(df)
-      })
-      out = dat[[1]]
-      if(length(dat) > 1) {
-        for(i in 2:length(dat)) {
-          out = merge.data.frame(out, dat[[i]], all = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
-        }
-      }
-      return(list(text = lapply(foo, FUN = function(x) c(list("$FCSversion" = x$header$start), x$text[names(x$text) != "$FCSversion"])), 
-                  dat = out))
-    })
-  }, error = function(e) {
-    stop(e$message, call. = FALSE)
-  }, finally = {
-    if(display_progress) endPB(pb)
-  })
+  features = FCS_merge_dataset(fcs, ...)[[1]]$data
   
-  # merge all features
-  features = fcs[[1]]$dat
-  L = length(fcs)
-  if(L > 1) {
-    if(display_progress) pb = newPB(session = dots$session, label = "merging files", min = 1, max = L)
-    tryCatch({
-      for(i in 2:L) {
-        if(display_progress) setPB(pb, value = i, title = "Extracting FCS", label = "merging files")
-        features = merge.data.frame(features, fcs[[i]]$dat, all = TRUE,  stringsAsFactors = FALSE, check.names = FALSE)
-      }
-    }, error = function(e) {
-      stop(e$message, call. = FALSE)
-    }, finally = {
-      if(display_progress) endPB(pb)
-    })
-  }
   identif = names(features) %in% c("import_file", "import_subfile")
-  idx = features[, identif]
+  idx = features[, identif, drop = FALSE]
+  if(!"import_file" %in% names(idx)) idx$import_file = fcs[[1]][["@IFC_file"]]
+  if(!"import_subfile" %in% names(idx)) idx$import_subfile = 1
   obj_count = as.integer(nrow(features))
   
   multiple = prod(length(unique(idx[, 1])), length(unique(idx[, 2]))) > 1
@@ -462,14 +737,17 @@ ExtractFromFCS <- function(fileName, ...) {
     idx$count = 1:obj_count
     all_obj = rep(FALSE, obj_count)
     pops = by(idx, idx[, c("import_file", "import_subfile")], FUN = function(x) {
-      name = paste(unique(x$import_file), unique(x$import_subfile), sep = "_")
+      if(length(unique(idx[, "import_subfile"])) == 1) {
+        name = unique(x$import_file)
+      } else {
+        name = paste(unique(x$import_file), "dataset", unique(x$import_subfile), sep = "_")
+      }
       obj = all_obj
       obj[x$count] <- TRUE
       buildPopulation(name = name, type = "T", color = "White", lightModeColor = "Black", obj = obj)
     })
     pops = pops[sapply(pops, FUN = function(p) length(p) != 0)]
   }
-  
   features = subset(x = features, select = !identif)
   features_def = lapply(names(features), FUN = function(i_feat) {
     # TODO check it it correctly imports linear values
@@ -479,33 +757,48 @@ ExtractFromFCS <- function(fileName, ...) {
   
   # fill min object
   instrument = sapply(fcs, FUN = function(x) {
-    tmp = x$text[[1]]$`$CYT`
+    tmp = x$text$`$CYT`
     if((length(tmp) == 0) || (tmp == "")) return("unk")
     return(tmp)
   })
   FCS_version = sapply(fcs, FUN = function(x) {
-    tmp = x$text[[1]]$`$FCSversion`
+    tmp = x$text[["@IFC_FCSversion"]]
     if((length(tmp) == 0) || (tmp == "")) return("unk")
     return(tmp)
   })
   spillover = lapply(fcs, FUN = function(x) {
-    tmp = x$text[[1]][c("SPILL","spillover","$SPILLOVER")]
+    tmp = x$text[c("$SPILLOVER","SPILL","spillover")]
     tmp = tmp[sapply(tmp, length) != 0]
     if(length(tmp) == 0) return(NULL)
     return(tmp)
   })
-  if(length(spillover) == 1) spillover = spillover[[1]]
-  if(length(spillover) == 1) spillover = spillover[[1]]
+  spillover = spillover[sapply(spillover, length) != 0]
+  if(is.list(spillover) && length(spillover) == 1) spillover = spillover[[1]]
+  if(is.list(spillover) && length(spillover) == 1) spillover = spillover[[1]]
+  if(!is.list(spillover) && length(spillover) == 1 && spillover == "") spillover = NULL
+  if(length(spillover) != 0) {
+    features_names = parseFCSname(names(features))
+    spillover = try(convert_spillover(spillover), silent = TRUE)
+    if(inherits(spillover, "try-error")) {
+      spillover = NULL
+    } else {
+      rownames(spillover) <- names(features)[apply(sapply(colnames(spillover), FUN = function(x) {
+        x==features_names$PnN
+      }), 2, FUN = function(i) which(i)[1])]
+    }
+  }
   # checksum = sapply(fcs, FUN = function(x) {
   #   tmp = x$description[[1]]$`$ENDDATA`
   #   if((length(tmp) == 0) || (tmp == "")) return("unk")
   #   return(tmp)
   # })
   
-  min_data$fileName = normalizePath(fileName[1], winslash = "/")
-  min_data$description$Assay = data.frame(date = file.info(fileName[1])$mtime, FCS_version = paste0(FCS_version, collapse = ", "), stringsAsFactors = FALSE)
-  min_data$description$ID = data.frame(file = fileName[1],
-                                       creation = format(file.info(fileName[1])$ctime, format = "%d-%b-%y %H:%M:%S"),
+  min_data$fileName = normalizePath(attr(fcs, "fileName"), winslash = "/", mustWork = FALSE)
+  bar <- unique(idx[, "import_file"])
+  if(length(bar) > 1) min_data$Merged_fcs <- bar
+  min_data$description$Assay = data.frame(date = file.info(min_data$fileName)$mtime, FCS_version = paste0(FCS_version, collapse = ", "), stringsAsFactors = FALSE)
+  min_data$description$ID = data.frame(file = min_data$fileName,
+                                       creation = format(file.info(min_data$fileName)$ctime, format = "%d-%b-%y %H:%M:%S"),
                                        objcount = obj_count,
                                        stringsAsFactors = FALSE)
   min_data$description$FCS = min_data$description$ID
@@ -553,6 +846,51 @@ ExtractFromFCS <- function(fileName, ...) {
   return(min_data)
 }
 
+#' @title FCS File Reader
+#' @description
+#' Extracts data from Flow Cytometry Standard (FCS) Files.
+#' @param fileName path(s) of file(s). If multiple files are provided they will be merged and 
+#' populations will be created to identify each single file within returned `IFC_data` object.
+#' @source Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \doi{10.1002/cyto.a.20825}.
+#' @param ... other arguments to be passed to readFCS function, with the exception of 'options$text_only'.
+#' @return A named list of class `IFC_data`, whose members are:\cr
+#' -description, a list of descriptive information,\cr
+#' -Merged_fcs, character vector of path of files used to create fcs, if input was a merged,\cr
+#' -fileName, path of fileName input,\cr
+#' -fileName_image, path of .cif image fileName is referring to,\cr
+#' -features, a data.frame of features,\cr
+#' -features_def, a describing how features are defined,\cr
+#' -graphs, a list of graphical elements found,\cr
+#' -pops, a list describing populations found,\cr
+#' -regions, a list describing how regions are defined,\cr
+#' -images, a data.frame describing information about images,\cr
+#' -offsets, an integer vector of images and masks IFDs offsets,\cr
+#' -stats, a data.frame describing populations count and percentage to parent and total population,\cr
+#' -checksum, a checksum integer.
+#' @export
+ExtractFromFCS <- function(fileName, ...) {
+  # create structure
+  dots = list(...)
+  dots = dots[names(dots) != "text_only"]
+  display_progress = dots$display_progress
+  if(length(display_progress) == 0) display_progress = TRUE
+  assert(display_progress, len=1, alw = c(TRUE, FALSE))
+  fileName = normalizePath(path = fileName, winslash = "/", mustWork = TRUE)
+  
+  # read the fcs file and extract features and description
+  L = length(fileName)
+  if(display_progress) {
+    pb = newPB(session = dots$session, label = "reading files", min = 0, max = L)
+    on.exit(endPB(pb))
+  }
+  fcs = lapply(1:L, FUN = function(i_file) {
+    if(display_progress) setPB(pb, value = i_file, title = "Extracting FCS", label = "reading files")
+    FCS_merge_dataset(do.call(what = readFCS,  args=c(dots, list(fileName = fileName[[i_file]]))))[[1]]
+  })
+  attr(fcs, "fileName") <- fileName[1]
+  FCS_to_data(fcs, ...)
+}
+
 #' @title FCS File Writer
 #' @description
 #' Writes an `IFC_data` object to a Flow Cytometry Standard (FCS) file.
@@ -569,16 +907,16 @@ ExtractFromFCS <- function(fileName, ...) {
 #' Otherwise, you will get an error saying that overwriting source file is not allowed.\cr
 #' Note also that an original file will never be overwritten.
 #' @param delimiter an ASCII character to separate the FCS keyword-value pairs. Default is : "/".
-#' @param cytometer string, if provided it to use to fill $CYT keyword.\cr
-#' However, when missing it will be filled with obj$description$FCS$instrument if found, otherwise "Image Stream" will be used.
-#' @param ... other arguments to be passed.
+#' @param cytometer string, if provided it will be used to fill $CYT keyword.\cr
+#' However, when missing $CYT will be filled with obj$description$FCS$instrument if found, or "Image Stream" otherwise.
+#' @param ... other arguments to be passed. keyword-value pairs can be passed here.
 #' @return invisibly returns full path of exported file.
 #' @export
 ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytometer = "Image Stream", ...) {
   dots = list(...)
   # change locale
   locale_back = Sys.getlocale("LC_ALL")
-  on.exit(suppressWarnings(Sys.setlocale("LC_ALL", locale = locale_back)), add = TRUE)
+  on.exit(suppressWarnings({Sys.setlocale("LC_ALL", locale = locale_back); gc(verbose = FALSE)}), add = TRUE)
   suppressWarnings(Sys.setlocale("LC_ALL", locale = "English"))
   now = format(Sys.time(), format = "%d-%b-%y %H:%M:%S")
   
@@ -612,7 +950,7 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
     if(!overwrite) stop(paste0("file ",write_to," already exists"))
     if(tolower(fileName) == tolower(write_to)) stop("you are trying to overwrite source file which is not allowed")
     tryCatch({
-      fcs = readFCS(fileName = write_to)
+      fcs = readFCS(fileName = write_to, text_only = TRUE)
     }, error = function(e) {
       stop(paste0(write_to, "\ndoes not seem to be well formatted")) 
     })
@@ -638,29 +976,37 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
   
   # init header
   header = list(version  = "FCS3.0",
-                space    =  "    ",
+                space    = "    ",
                 text_beg = "      58",
-                text_end = character(),
-                data_beg = character(),
-                data_end = character(),
+                text_end = "        ",
+                data_beg = "        ",
+                data_end = "        ",
                 anal_beg = "       0",
                 anal_end = "       0")
   
   # we modify features to add populations
-  all_pops = do.call(what = cbind, args = lapply(obj$pops, FUN = function(p) p$obj))
-  colnames(all_pops) = names(obj$pops)
-  features = cbind(obj$features[, setdiff(names(obj$features), colnames(all_pops))], all_pops)
+  features = fastCbind(obj$features[, setdiff(names(obj$features), names(obj$pops)), drop = FALSE],
+                       sapply(names(obj$pops), simplify = FALSE, FUN = function(p) obj$pops[[p]]$obj))
   # need to replace non finite values by something; IDEAS is using 0 so we use 0 also
   # TODO maybe replace -Inf by features min and +Inf by features max ?
-  features = as.data.frame(apply(features, 2, FUN = function(x) {x[!is.finite(x)] <- 0; x}), stringsAsFactors = TRUE)
+  features = as.data.frame(apply(features, 2, cpp_replace_non_finite), stringsAsFactors = TRUE)
+  # comma (=,) is not allowed in features names according to fcs specification so it is replaced by _
+  names(features) = gsub(",","_",names(features),fixed=TRUE)
   
   # determines length of text_segment2
-  N = names(features)
+  feat_names = parseFCSname(names(features))
+  N = feat_names$PnN
+  S = feat_names$PnS
   L = length(N)
   text2_length = 0
   text_segment2 = lapply(1:L, FUN = function(i) {
-    # each time we write /$PnN/<feature_name>/$PnB/32/$PnE/0, 0/$PnR/<feature_max_value>
-    foo = c("", paste0("$P",i,"N"), N[i], paste0("$P",i,"B"), "32", paste0("$P",i,"E"), "0, 0", paste0("$P",i,"R"), ceiling(max(features[, i], na.rm = TRUE)))
+    # each time we write /$PnN/<feature_name>/$PnB/32/$PnE/0, 0/$PnR/<feature_max_value> and /$PnS/<feature_alt-name> if PnS is not empty
+    # since we write type "F" this has no importance
+    bar = max(features[, i], na.rm = TRUE)
+    # if(ceiling(bar) == bar) bar = bar + 1
+    # FIXME shall we use 262144, as it is commonly used ?
+    foo = c("", paste0("$P",i,"N"), N[i], paste0("$P",i,"B"), "32", paste0("$P",i,"E"), "0, 0", paste0("$P",i,"R"), ceiling(bar))
+    if(S[i] != "") foo = c(foo, paste0("$P",i,"S"), S[i])
     foo = gsub(pattern = delimiter, x = foo, replacement = delimiter_esc, fixed=TRUE)
     foo = charToRaw(paste(foo, collapse = delimiter))
     text2_length <<- text2_length + length(foo)
@@ -669,41 +1015,53 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
   cyt = obj$description$FCS$instrument
   if((length(cyt) == 0 ) || (cyt == "")) cyt = "Image Stream"
   if(!missing(cytometer)) cyt = cytometer
+  if(length(obj$fileName_image) == 0) obj$fileName_image = ""
   
-  # init text segment with mandatory + custom parameters
-  text_segment1 = list("$BEGINSTEXT" = "58",
-                       "$BEGINANALYSIS" = "0",
-                       "$ENDANALYSIS" = "0",
-                       "$BYTEORD" = c("4,3,2,1", "1,2,3,4")[(.Platform$endian == "little") + 1],
-                       "$DATATYPE" = "F",
-                       "$MODE" = "L",
-                       "$NEXTDATA" = "0",
-                       "$TOT" = obj$description$ID$objcount,
+  # init text segment with mandatory + custom parameters #* = mandatory
+  text_segment1 = list("$BEGINSTEXT" = "0",                                                      #*
+                       "$ENDSTEXT" = "0",                                                        #*
+                       "$BEGINANALYSIS" = "0",                                                   #*
+                       "$ENDANALYSIS" = "0",                                                     #*
+                       "$BYTEORD" = c("4,3,2,1", "1,2,3,4")[(.Platform$endian == "little") + 1], #*
+                       "$DATATYPE" = "F",                                                        #*
+                       "$MODE" = "L",                                                            #*
+                       "$NEXTDATA" = "0",                                                        #*
+                       "$TOT" = obj$description$ID$objcount,                                     #*
+                       "$PAR" = L,                                                               #*
+                       #* BEGINDATA and ENDDATA are also mandatory and will be added afterwards
+                       #* PnB, PnE, PnN, and PnR are also mandatory and are part of text_segment2
                        "$CYT" = cyt,
-                       "$FIL" = obj$fileName_image,
-                       "$PAR" = L,
-                       "$FILENAME" = write_to,
-                       "$GUID" = basename(write_to),
+                       "@IFC_fileName" = obj$fileName,
+                       "@IFC_fileName_image" = obj$fileName_image,
                        "@IFC_version" = pkg_ver,
-                       "@date" = now
+                       "@IFC_date" = now
   )
   
-  
-  #determines length of data
+  # adds extra keywords from ...
+  # removes keywords that are already in text_segment1 or that are named "session", "$BEGINDATA", "$ENDDATA" or that have no name
+  extra_keywords = setdiff(names(dots), c(names(text_segment1), "$BEGINDATA", "$ENDDATA", "session", ""))
+  # removes keywords that are already in text_segment2 ($PnN, $PnS, $PnB, $PnE, $PnR)
+  extra_keywords = grep("^\\$P\\d.*[N|S|B|E|R|]$", extra_keywords, value = TRUE, invert = TRUE)
+  # gets keywords in dots
+  extra_keywords = dots[extra_keywords]
+  # removes keywords whose values are NULL
+  extra_keywords = extra_keywords[sapply(extra_keywords, length) != 0]
+  # adds to text_segment1
+  text_segment1 = c(text_segment1, extra_keywords)
+  # determines length of data
   data_length = 4 * L * nrow(features)
   
   # determines length of mandatory param
   N = names(text_segment1)
-  text1_length = sum(c(nchar("$ENDSTEXT"),  2, # 2 for additional delimiters
-                       nchar("$BEGINDATA"), 2, # 2 for additional delimiters
+  text1_length = sum(c(nchar("$BEGINDATA"), 2, # 2 for additional delimiters
                        nchar("$ENDDATA"),   2, # 2 for additional delimiters, there is already one at the beg of text2
                        sapply(1:length(text_segment1), FUN = function(i) {
                          length(charToRaw(paste(c("",
                                                   gsub(delimiter, delimiter_esc, N[i], fixed=TRUE), # FIXME should we escape keyword ?
                                                   gsub(delimiter, delimiter_esc, text_segment1[[i]], fixed=TRUE)), # delimiter if present in value should be escaped
                                                 collapse = delimiter)))
-                       }), text2_length,    1, # 1 for additional delimiters, to terminate text2
-                                           57  # 57 for size of header
+                       }), text2_length,
+                       nchar(paste0(header, collapse = ""))
   ))
   
   # compute missing offsets 
@@ -712,21 +1070,18 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
   # so we use a function to optimize it
   f = function(x, text_length) {
     data_beg = x + 1
-    if(data_beg >= 1e9) data_beg = 0
-    data_end = x + data_length - 1
-    if(data_end >= 1e9) data_end = 0
-    ans = text_length + nchar(x) + nchar(data_beg) + nchar(data_end)
+    data_end = x + data_beg + data_length - 1
+    ans = text_length + nchar(num_to_string(data_beg)) + nchar(num_to_string(data_end))
     if(ans != x) ans = f(x = ans, text_length = text_length)
     return(ans)
   }
   text_end = f(x = text1_length, text_length = text1_length)
-  if(text_end >= 1e9) stop("primary text segment is too big")
+  if(text_end >= 1e8) stop("primary text segment is too big")
   header$text_end = sprintf("%8i", text_end)
-  text_segment1 = c(text_segment1, list("$ENDSTEXT" = as.character(text_end)))
   
   # BEGINDATA
   data_beg = text_end + 1 # +1 because data start just after text segment end
-  if(data_beg >= 1e9) {
+  if(data_beg >= 1e8) {
     header$data_beg = sprintf("%8i", 0)
   } else {
     header$data_beg = sprintf("%8i", data_beg)
@@ -735,7 +1090,7 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
   
   # ENDDATA
   data_end = data_beg + data_length - 1 #-1 because last data byte is at minus one from total length
-  if(data_end >= 1e9) {
+  if(data_end >= 1e8) {
     header$data_end = sprintf("%8i", 0)
   } else {
     header$data_end = sprintf("%8i", data_end)

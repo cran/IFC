@@ -4,14 +4,15 @@
 \alias{readFCS}
 \title{FCS File Parser}
 \source{
-Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \url{https://onlinelibrary.wiley.com/doi/10.1002/cyto.a.20825}.
+Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \doi{10.1002/cyto.a.20825}.
 }
 \usage{
 readFCS(
   fileName,
   options = list(header = list(start = list(at = 0, n = 6), text_beg = list(at = 10, n
     = 8), text_end = list(at = 18, n = 8), data_beg = list(at = 26, n = 8), data_end =
-    list(at = 34, n = 8)), apply_scale = TRUE, first_only = TRUE),
+    list(at = 34, n = 8)), apply_scale = TRUE, first_only = TRUE, force_header = FALSE,
+    text_only = FALSE),
   display_progress = TRUE,
   ...
 )
@@ -21,13 +22,15 @@ readFCS(
 
 \item{options}{list of options used to parse FCS file. It should contain:\cr
 - header, a list whose members define the "at" offset from header$start$at and the "n" number of bytes to extract:\cr
--- start: where start reading FCS dataset.                  Default is list(at = 0, n = 6),\cr
+-- start: where start reading FCS dataset.                  Default is list(at = 0,  n = 6),\cr
 -- text_beg: where to retrieve file text segment beginning. Default is list(at = 10, n = 8),\cr
 -- text_end: where to retrieve file text segment end.       Default is list(at = 18, n = 8),\cr
 -- data_beg: where to retrieve file text segment beginning. Default is list(at = 26, n = 8),\cr
 -- data_end: where to retrieve file text segment end.       Default is list(at = 34, n = 8),\cr
-- apply_scale, whether to apply data scaling. Default is TRUE\cr
-- first_only, whether to extract only first. Default is FALSE}
+- apply_scale, whether to apply data scaling. It only applies when fcs file is stored as DATATYPE "I". Default is TRUE.\cr
+- first_only, whether to extract only the first dataset when several. Default is TRUE.\cr
+- force_header, whether to force the use of header to determine the position of data segment. Default is FALSE, for using positions found in "$BEGINDATA" and "$ENDDATA" keywords.\cr
+- text_only, whether to only extract text segment. Default is FALSE.}
 
 \item{display_progress}{whether to display a progress bar. Default is TRUE.}
 
@@ -45,5 +48,7 @@ each sub-list contains:\cr
 Parse data from Flow Cytometry Standard (FCS) compliant files.
 }
 \details{
-'options' may be tweaked according to file type, instrument and software used to generate it. Default 'options' should allow to read most files.
+'options' may be tweaked according to file type, instrument and software used to generate it.\cr
+Default 'options' should allow to read most files.\cr
+'apply_scale', 'force_header', 'first_only', and 'textt_only' can also be passed to 'options' thanks to ...
 }

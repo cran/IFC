@@ -121,7 +121,7 @@ data_to_DAF = function(obj, write_to, viewing_pop = "All", overwrite = FALSE,
     write_to = normalizePath(write_to, winslash = "/", mustWork = FALSE)
     if(!overwrite) stop(paste0("file ",write_to," already exists"))
     if(tolower(fileName) == tolower(write_to)) stop("you are trying to overwrite source file which is not allowed")
-    xmlEND_export = cpp_scanFirst(fname = write_to, target = "</Assay>", start = 0, end = 0)
+    xmlEND_export = cpp_scanFirst(write_to, charToRaw('</Assay>'), start = 0, end = 0)
     if(xmlEND_export > 0) {
       xml_export = read_xml(readBin(con = write_to, what = "raw", n = xmlEND_export + nchar("</Assay>") - 1), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
       tryCatch({
@@ -238,7 +238,7 @@ data_to_DAF = function(obj, write_to, viewing_pop = "All", overwrite = FALSE,
   # adds attributes to root node
   IDEAS_version = obj$description$Assay$IDEAS_version
   if(binary) {
-    if(length(IDEAS_version) == 0) IDEAS_version = "6.2.183.0"
+    if(length(IDEAS_version) == 0) IDEAS_version = "6.2.64.0"
     root %>% xml_set_attrs(value = c(IFC_version = pkg_ver, date = now, IDEAS_version = IDEAS_version, binaryfeatures = "True"))
   } else {
     if(length(IDEAS_version) == 0) IDEAS_version = "6.1.822.0"

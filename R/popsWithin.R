@@ -118,13 +118,13 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
              for(i_def in 1:length(pop$names)) replace_with=c(replace_with,random_name(n=10,special=NULL,forbidden=c(replace_with,pop_def_tmp)))
              pop_def_tmp[!is_ope] <- paste0("`",replace_with,"`")
              colnames(comb_tmp)=replace_with
-             comb_tmp=eval(parse(text=paste0(pop_def_tmp,collapse=" ")),as.data.frame(comb_tmp,stringsAsFactors=FALSE))
+             comb_tmp=eval(expr=parse(text=paste0(pop_def_tmp,collapse=" ")),envir=as.data.frame(comb_tmp,stringsAsFactors=FALSE),enclos=new.env())
              pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & comb_tmp
            }, 
            "T" = {
              if(length(pop$obj) != obj_number) {
-               Kp = class(pop$obj)
-               if(Kp%in%"numeric" | Kp%in%"integer") {
+               Kp = typeof(pop$obj)
+               if(Kp%in%c("double","integer")) {
                  if((obj_number <= max(pop$obj)) | (min(pop$obj) < 0) | any(duplicated(pop$obj))) stop(paste0("trying to compute a tagged population with element(s) outside of objects acquired: ", pop$name))
                  pops[[i]]$obj=rep(FALSE,obj_number)
                  pops[[i]]$obj[pop$obj+1]=TRUE

@@ -41,6 +41,9 @@
 #include "../inst/include/decomp.hpp"
 #include "../inst/include/extract.hpp"
 #include "../inst/include/resize.hpp"
+#include "../inst/include/group.hpp"
+#include "../inst/include/plot.hpp"
+#include "../inst/include/cbind.hpp"
 using namespace Rcpp;
 
 // FROM align
@@ -53,7 +56,7 @@ using namespace Rcpp;
 //' @param dy, a double y spatial offset. It has to be within ]-1,+1[. Default is NA_REAL for no change.
 //' @details It is intended to be applied on raw images matrices from .rif files so has to generate spatial offset corrected image matrices.\cr
 //' See William E. Ortyn et al. Sensitivity Measurement and Compensation in Spectral Imaging. Cytometry A 69 852-862 (2006).
-//' \url{https://onlinelibrary.wiley.com/doi/full/10.1002/cyto.a.20306}
+//' \doi{10.1002/cyto.a.20306}
 //' @return a NumericMatrix.
 //' @keywords internal
 ////' @export
@@ -125,8 +128,95 @@ Rcpp::LogicalVector cpp_pnt_in_gate (const Rcpp::NumericMatrix pnts,
   return hpp_pnt_in_gate (pnts, gate, algorithm, epsilon);
 }
 // END gate
-
 // FROM utils
+//' @title Use Rcpp to Apply Any on Matrix Rows
+//' @name cpp_fast_rowAny
+//' @description
+//' Computes any across matrix rows.
+//' @param M_ a Nullable LogicalVector. /!\ But cast to LogicalMatrix
+//' @return a LogicalVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_rowAny(const Rcpp::Nullable<Rcpp::LogicalVector> M_ = R_NilValue) {
+  return hpp_fast_rowAny(M_);
+}
+
+//' @title Use Rcpp to Apply Any on List members
+//' @name cpp_fast_listAny
+//' @description
+//' Computes any across list members
+//' @param L_ a Nullable List.
+//' @return a LogicalVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_listAny(const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue) {
+  return hpp_fast_listAny(L_);
+}
+
+//' @title Use Rcpp for Range
+//' @name cpp_fast_range
+//' @description
+//' Determines range of numeric vector
+//' @param x_ a Nullable NumericVector.
+//' @details the behaviour is the same as R base::range(x_, na.rm = TRUE, finite = TRUE) without creating warnings
+//' @return a NumericVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::NumericVector cpp_fast_range(const Rcpp::Nullable<Rcpp::NumericVector> x_ = R_NilValue) {
+  return hpp_fast_range(x_);
+}
+
+//' @title Use Rcpp for Sampling
+//' @name cpp_fast_sample
+//' @description
+//' Create a sample of integers
+//' @param n a R_len_t, max number integers to choose from.
+//' @param size a R_len_t the desired size of return integers.
+//' @param replace a bool determining if sampling should be done with replacement. Default is false.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerVector cpp_fast_sample(const R_len_t n = 0,
+                                    const R_len_t size = 0,
+                                    const bool replace = false) {
+  return hpp_fast_sample(n, size, replace);
+}
+
+//' @title Get Bytes Order
+//' @name cpp_get_bytes_order
+//' @description
+//' This function expands bytes order to the whole data
+//' @param obj number of objects in the data.
+//' @param byt_ IntegerVector of number of bytes to take from 'ord_'.
+//' @param ord_ IntegerVector bytes order. 
+//' @param rev bool whether to reverse order or not. Default is false.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order (const R_len_t obj = 0,
+                                                         const Rcpp::Nullable<Rcpp::IntegerVector> byt_ = R_NilValue,
+                                                         const Rcpp::Nullable<Rcpp::IntegerVector> ord_ = R_NilValue,
+                                                         const bool rev = false) {
+  return hpp_get_bytes_order (obj, byt_, ord_, rev);
+}
+
+//' @title Non Finite Values Replacement
+//' @name cpp_replace_non_finite
+//' @description
+//' This function replaces non finite values (NA, NaN -Inf and +Inf)
+//' @param V_ a NumericVector.
+//' @param by a double used as replcaement value. Default is 0.0
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::NumericVector> cpp_replace_non_finite(const Rcpp::Nullable<Rcpp::NumericVector> V_ = R_NilValue,
+                                                           const double by = 0.0) {
+  return hpp_replace_non_finite (V_, by);
+}
+
 //' @title Gamma Computation
 //' @name cpp_computeGamma
 //' @description
@@ -174,7 +264,7 @@ Rcpp::RawVector cpp_writeBMP (const Rcpp::NumericVector image) {
 //' @details If file is a TIFF it returns endianness of file, 'big' or 'little.
 //' Otherwise, it shows an error and returns an empty string.
 //' @param fname string, path to file.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
 // [[Rcpp::export]]
@@ -191,7 +281,7 @@ std::string cpp_checkTIFF (const std::string fname) {
 //' If obj_count <= 0 then progress_bar is forced to false.
 //' @param display_progress bool, whether to display a progress bar. Default is false.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is false.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @return an integer vector with offsets of IFDs found.
 //' @keywords internal
 ////' @export
@@ -215,7 +305,7 @@ Rcpp::IntegerVector cpp_getoffsets_noid(const std::string fname,
 //' Note that, if 0 is provided, it will be automatically set to 1.
 //' @param force_trunc whether to force truncation for all TAGS types. Default is FALSE.\cr
 //' If 'true', 'trunc_bytes' will be used for TAGS (3, 4, 5, 8, 9, 10, 11 and 12) to extract desired number of individual scalar corresponding to each types.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
 // [[Rcpp::export]]
@@ -234,7 +324,7 @@ Rcpp::List cpp_getTAGS (const std::string fname,
 //' @param fname string, path to file.
 //' @param offset uint32_t, position of the IFD beginning.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is 'false'.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
 // [[Rcpp::export]]
@@ -253,7 +343,7 @@ Rcpp::List cpp_fastTAGS (const std::string fname,
 //' If obj_count <= 0 then progress_bar is forced to false.
 //' @param display_progress bool, whether to display a progress bar. Default is false.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is false.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @return a list of integer vectors with OBJECT_ID, TYPE and OFFSET of IFDs found.
 //' @keywords internal
 ////' @export
@@ -270,7 +360,7 @@ Rcpp::List cpp_getoffsets_wid(const std::string fname,
 //' @description
 //' Computes sum of img IFDs (Image Field Directory) offsets of objects 0, 1, 2, 3 and 4.
 //' @param fname string, path to file.
-//' @source TIFF 6.0 specifications available at \url{https://www.adobe.io/open/standards/TIFF.html}
+//' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @return an integer vector with offsets of IFDs found.
 //' @keywords internal
 ////' @export
@@ -403,6 +493,30 @@ uint64_t cpp_int64_to_uint64 (const int64_t x) {
 int64_t cpp_uint64_to_int64 (const uint64_t x) {
   return hpp_uint64_to_int64 (x);
 }
+
+//' @title Vectorize Int32 to Uint32 32bits Conversion
+//' @name cpp_v_int32_to_uint32
+//' @description
+//' Converts 32bits vector of integers from unsigned to signed
+//' @param V a NumericVector
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int32_to_uint32 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
+  return hpp_v_int32_to_uint32(V);
+}
+
+//' @title Vectorize Int64 to Uint64 64bits Conversion
+//' @name cpp_v_int64_to_uint64
+//' @description
+//' Converts 64bits vector of integers from unsigned to signed
+//' @param V a NumericVector
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int64_to_uint64 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
+  return hpp_v_int64_to_uint64(V);
+}
 // END trans
 
 // FROM scan
@@ -413,7 +527,7 @@ int64_t cpp_uint64_to_int64 (const uint64_t x) {
 //' If found, it returns the position in bytes of the target.
 //' Otherwise, it returns 0.
 //' @param fname string, path to file.
-//' @param target string, exact string to be searched for. At least 1 character and should not exceed 1024 characters.
+//' @param raw a Rcpp::RawVector, exact target to be searched for. When converted to string it should be of at least 1 character and not exceed 1024 characters.
 //' @param start size_t, position where to begin search.
 //' It can't be superior or equal than file size or end (when end is different from 0 and inferior than file size).
 //' @param end size_t, position where to stop searching. Default is 0.
@@ -425,14 +539,250 @@ int64_t cpp_uint64_to_int64 (const uint64_t x) {
 ////' @export
 // [[Rcpp::export]]
 std::size_t cpp_scanFirst(const std::string fname, 
-                          const std::string target, 
+                          const Rcpp::RawVector raw, 
                           const std::size_t start = 0, 
                           const std::size_t end = 0, 
                           const uint8_t buf_size = 64) {
-  return hpp_scanFirst(fname, target, start, end, buf_size); 
+  return hpp_scanFirst(fname, raw, start, end, buf_size); 
 }
 // END scan
 
+// FROM group
+//' @title Fast Factorize Vector
+//' @name cpp_fast_factor
+//' @description
+//' Makes factor with Rcpp
+//' @param x a SEXP only NILSXP, LGLSXP, INTSXP, REALSXP, STRSXP, RAWSXP are handled.
+//' @param handleNA a bool specifying if NA should be returned as NA or if they should be attributed a unique integer.
+//' @details returned object should not be of class `factor` so has to prevent malformed factor' error when printing the result in R.
+//' For this reason, it is aimed to be wrap in an R function to handle factor class / handleNA balance.\cr
+//' e.g. either:
+//' - structure(cpp_fast_factor(df, TRUE), class = "factor"), or,
+//' - structure(cpp_fast_factor(unclass(df), FALSE), levels = NULL)
+//' @source adaptation from Kevin Ushey code \url{https://gallery.rcpp.org/articles/fast-factor-generation/}
+//' @return an IntegerVector, with attributes "levels" being the non-NA unique value(s) found
+//' and "lvs" the total number of unique values found (including NA).
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+SEXP cpp_fast_factor( SEXP x, 
+                      const bool handleNA = true) {
+  return hpp_fast_factor(x, handleNA);
+}
+
+//' @title Data Frame Merge Groups with Rcpp
+//' @name cpp_group_df
+//' @description
+//' Computes global grouping factor from data.frame columns
+//' @param df a DataFrame.
+//' @return an IntegerVector with the resulting global grouping factor and a "table" attribute representing the amount of scalar in each resulting level.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerVector cpp_group_df(const Rcpp::DataFrame df) {
+  return hpp_group_df(df);
+}
+// END group
+
+// FROM plot
+//' @title Coordinates to Pixels
+//' @name cpp_coord_to_px
+//' @description low-level function to compute pixels coordinates
+//' @param x NumericVector of x-coordinates of the points.
+//' @param y NumericVector of y-coordinates of the points.
+//' @param param NumericVector of parameters to scale raw points coordinates to pixels coordinates.
+//' @return a 2 columns IntegerMatrix of x and y pixels coordinates.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerMatrix cpp_coord_to_px (const Rcpp::NumericVector x,
+                                     const Rcpp::NumericVector y,
+                                     const Rcpp::NumericVector param) {
+  return hpp_coord_to_px(x, y, param);
+}
+
+//' @title Image to Native Raster Conversion
+//' @name cpp_as_nativeRaster
+//' @description Converts 3D image array to nativeRaster
+//' @param x an IntegerVecter /!\ It should be coercible to 3D array [height, width, rgba]
+//' @return a nativeRaster IntegerMatrix
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerMatrix cpp_as_nativeRaster(const Rcpp::IntegerVector x) {
+  return hpp_as_nativeRaster(x);
+}
+
+//' @title Draw Shape to Image
+//' @name cpp_draw
+//' @description low-level function to add shape on image
+//' @param img an IntegerVector. A non null array of dimensions [nrow, ncol, 4].
+//' @param coords an IntegerMatrix whose rows are points to draw and with:\cr
+//' - 1st column being img col coordinate in px,\cr
+//' - 2nd column being img row coordinate in px.
+//' @param mask a LogicalMatrix where every true value will be added to the image.
+//' @param color, a 4 rows IntegerMatrix specifying rgba, from 0 to 255.
+//' @param blur_size, a R_len_t the size of the gaussian blurring kernel. Default is 9.
+//' @param blur_sd, a double the sd of the gaussian blurring kernel. Default is 3.0.
+//' @details shape according to 'mask' will be drawn on 'img' centered at coordinates coords[, 1], coords[, 0]
+//' and every pixels being part of the shape will be filled with 'color'.
+//' If only one 'color' is provided, this 'color' will be used for each points.
+//' If more than one 'color' is provided, then if number of colors (ncol) equals the number of points 'color' will be used as is for each single point.
+//' Otherwise, 'color' will be considered as a color-gradient and density will be computed.
+//' /!\ please note that IFC:::densCols() is faster to compute color based on density for n < 20000 points, so it's worth using it when number of points are lower.
+//' @keywords internal
+//' @return /!\ nothing is returned but img is modified in-place
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerVector cpp_draw (const Rcpp::IntegerVector img,
+                              const Rcpp::IntegerMatrix coords = Rcpp::IntegerMatrix(1,2),
+                              const Rcpp::LogicalMatrix mask = Rcpp::LogicalMatrix(1),
+                              const Rcpp::IntegerMatrix color = Rcpp::IntegerMatrix(4,1),
+                              const R_len_t blur_size = 9,
+                              const double blur_sd = 3.0) {
+  Rcpp::IntegerVector out = Rcpp::clone(img);
+  hpp_draw(out, coords, mask, color, blur_size, blur_sd);
+  return out;
+}
+//' @title Raster Image
+//' @name cpp_raster
+//' @description low-level function to create plot raster
+//' @param width a uint16_t determining the returned image width.
+//' @param height a uint16_t determining the returned image height.
+//' @param obj a List containing drawing information:\cr
+//' - pch, an integer specifying a symbol to draw. Handled are [0-20]. Otherwise only a pixel will be drawn.\cr
+//' - size, an integer specifying the size in pixel of the shape, from 1 to 255.\cr
+//' - color a 4 rows IntegerMatrix (rgba) of the color used to draw the shape.\cr
+//' - coords, an IntegerMatrix whose rows are points to draw and with:\cr
+//' -* 1st column being img col coordinate in px,\cr
+//' -* 2nd column being img row coordinate in px.
+//' - blur_size an integer controlling the size of the blurring gaussian kernel.\cr
+//' - blur_sd a double controlling the sd of the blurring gaussian kernel.
+//' @param bg_ a Nullable IntegerVector that will be cast to 3D array when not NULL. Default is R_NilValue.\cr
+//' When not NULL, its dimensions should be the same as required by 'width' and 'height', otherwise an error will be thrown.\cr
+//' When not NULL, it will serve as a background to draw new points on top of it.
+//' @details shape according to 'pch' will be drawn centered at coordinates obj$coord[, 1], obj$coord[, 0]
+//' and every pixels being part of the shape will be filled with 'color'.
+//' If only one 'color' is provided, this 'color' will be used for each points.
+//' If more than one 'color' is provided, then if number of colors (ncol) equals the number of points 'color' will be used as is for each single point.
+//' Otherwise, 'color' will be considered as a color-gradient and density will be computed.
+//' /!\ please note that IFC:::densCols() is faster to compute color based on density for n < 20000 points, so it's worth using it when number of points are lower.
+//' @return an IntegerVector with dimensions [height, width, 4]
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerVector cpp_raster (const uint16_t width,
+                                const uint16_t height,
+                                const Rcpp::List obj,
+                                const Rcpp::Nullable <Rcpp::IntegerVector> bg_ = R_NilValue) {
+  return hpp_raster(width, height, obj, bg_);
+}
+// END plot
+
+// FROM cbind
+
+//' @title Fast Dataframe and Matrix Column Binding
+//' @name cpp_fast_cbind_DF_M
+//' @description
+//' Combines data.frame and matrix by columns
+//' @param Df_ a Nullable DataFrame.
+//' @param M_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a DataFrame.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_M(const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
+                                                    const Rcpp::Nullable<Rcpp::NumericVector> M_ = R_NilValue,
+                                                    const bool add_id = false) {
+  return hpp_fast_cbind_DF_M(Df_, M_, add_id);
+}
+
+//' @title Fast Matrix and Dataframe Column Binding
+//' @name cpp_fast_cbind_M_DF
+//' @description
+//' Combines matrix and data.frame by columns
+//' @param M_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
+//' @param Df_ a Nullable DataFrame.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a DataFrame.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_M_DF(const Rcpp::Nullable<Rcpp::NumericVector> M_ = R_NilValue,
+                                                    const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
+                                                    const bool add_id = false) {
+  return hpp_fast_cbind_M_DF(M_, Df_, add_id);
+}
+
+//' @title Dataframe and Dataframe Column Binding
+//' @name cpp_fast_cbind_DF_DF
+//' @description
+//' Combines numeric matrix by columns
+//' @param Df1_ a Nullable DataFrame.
+//' @param Df2_ a Nullable DataFrame.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a DataFrame.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_DF(const Rcpp::Nullable<Rcpp::DataFrame> Df1_ = R_NilValue,
+                                                     const Rcpp::Nullable<Rcpp::DataFrame> Df2_ = R_NilValue,
+                                                     const bool add_id = false) {
+  return hpp_fast_cbind_DF_DF(Df1_, Df2_, add_id);
+}
+
+//' @title Matrix and Matrix Column Binding
+//' @name cpp_fast_cbind_M_M
+//' @description
+//' Combines numeric matrix by columns
+//' @param M1_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
+//' @param M2_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a NumericVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::NumericVector> cpp_fast_cbind_M_M(const Rcpp::Nullable<Rcpp::NumericVector> M1_ = R_NilValue,
+                                                       const Rcpp::Nullable<Rcpp::NumericVector> M2_ = R_NilValue,
+                                                       const bool add_id = false) {
+  return hpp_fast_cbind_M_M(M1_, M2_, add_id);
+}
+
+//' @title Fast Dataframe and List Column Binding
+//' @name cpp_fast_cbind_DF_L
+//' @description
+//' Combines data.frame and list by columns
+//' @param Df_ a Nullable DataFrame.
+//' @param L_ a Nullable List.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a DataFrame.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_L(const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
+                                                    const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue,
+                                                    const bool add_id = false) {
+  return hpp_fast_cbind_DF_L(Df_, L_, add_id);
+}
+
+//' @title Fast List and Dataframe Column Binding
+//' @name cpp_fast_cbind_L_DF
+//' @description
+//' Combines list and data.frame by columns
+//' @param L_ a Nullable List.
+//' @param Df_ a Nullable DataFrame.
+//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
+//' @return a DataFrame.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_L_DF(const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue,
+                                                    const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
+                                                    const bool add_id = false) {
+  return hpp_fast_cbind_L_Df(L_, Df_, add_id);
+}
+// END cbind
 
 // FROM resize
 //' @title Matrix Cropping
@@ -449,7 +799,7 @@ std::size_t cpp_scanFirst(const std::string fname,
 Rcpp::NumericMatrix cpp_crop (Rcpp::NumericMatrix mat,
                               const R_len_t new_height = 0,
                               const R_len_t new_width = 0) {
-  return hpp_crop (mat, new_height, new_width);
+  return hpp_crop(mat, new_height, new_width);
 }
 
 //' @title Matrix Resizing
@@ -620,7 +970,7 @@ Rcpp::NumericMatrix cpp_normalize (const Rcpp::NumericMatrix mat,
                                    const bool full_range = false,
                                    const bool force_range = false, 
                                    const double gamma = 1.0) {
-  return hpp_normalize (mat, input_range, full_range, gamma);
+  return hpp_normalize (mat, input_range, full_range, force_range, gamma);
 }
 
 //' @title Matrix Cleanser

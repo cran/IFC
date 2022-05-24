@@ -6,7 +6,7 @@
   -IFC: An R Package for Imaging Flow Cytometry                                 
   -YEAR: 2020                                                                   
   -COPYRIGHT HOLDERS: Yohann Demont, Gautier Stoll, Guido Kroemer,              
-                      Jean-Pierre Marolleau, Loï?c Gaççon,                       
+                      Jean-Pierre Marolleau, Loïc Garçon,                       
                       INSERM, UPD, CHU Amiens                                   
  
  
@@ -494,6 +494,7 @@ Rcpp::List hpp_extract (const std::string fname,
         break;
       }
       }
+      // if(masks.hasAttribute("status")) msk.attr("removal") = "invalid";
       
       out[i] = hpp_transform(img[chan_idx],
                              colors[chan_idx],

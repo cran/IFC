@@ -28,7 +28,7 @@
 ################################################################################
 
 #' @title String Truncation
-#' @description Truncs character strings
+#' @description Truncates character strings
 #' @param x a string
 #' @param n desired length
 #' @details x will be truncated according to 'n' parameter. If x is longer than n '...' are appended.
@@ -40,15 +40,41 @@ trunc_string = function(x, n=22) {
   return(x)
 }
 
-#' @title File Extenstion Removal
-#' @description Remove file extension from file path
+#' @title File Extension Removal
+#' @description Removes file extension from file path
 #' @param x a file path
 #' @details file extension will be removed
 #' @keywords internal
 remove_ext <- function(x) {
-  x = as.character(x)
-  ext = getFileExt(x)
-  gsub(paste0("\\.",ext,"$"), "", x)
+  if(length(x) == 0) return(x)
+  xx = as.character(x)
+  sapply(1:length(xx), FUN = function(i) gsub(paste0("\\.",getFileExt(xx[i]),"$"), "", xx[i]))
+}
+
+#' @title Reverse String
+#' @description Reverses string.
+#' @param x a character vector.
+#' @keywords internal
+rev_string <- function(x) {
+  if(length(x) == 0) return(x)
+  sapply(strsplit(as.character(x), split = "", fixed = TRUE), FUN = function(i) paste0(rev(i), collapse=""))
+}
+
+#' @title FCS Name Parser
+#' @description 
+#' Separates names and alt-names from FCS features names.
+#' @param x a character vector of FCS features names.
+#' @details when created FCS features names are formatted as 'PnN < PnS >'.
+#' The current function allows the separation between PnN and PnS.
+#' @return a 2 columns data.frame of names (PnN) and alt-names (PnS).
+#' @keywords internal
+parseFCSname <- function(x) {
+  if(length(x) == 0) return(structure(as.data.frame(matrix(character(), ncol=2, nrow=0)), names = c("PnN", "PnS")))
+  foo = strsplit(rev_string(x), split = " < ", fixed = TRUE)
+  structure(as.data.frame(t(sapply(foo, FUN = function(x) {
+    if((length(x) < 2) || (substr(x[1], 1, 2) != "> ")) return(c(rev_string(paste0(x, collapse = " < ")), ""))
+    rev_string(c(paste0(x[-1], collapse=" < "), substr(x[1], 3, nchar(x[1]))))
+  })), stringsAsFactors = FALSE), names = c("PnN", "PnS"))
 }
 
 #' @title Special Character Replacement

@@ -76,6 +76,164 @@ bool iNotisNULL(const Rcpp::Nullable<Rcpp::IntegerVector> x_ = R_NilValue) {
   return false;
 }
 
+// Ensures LogicaVector is not NULL
+bool lNotisNULL(const Rcpp::Nullable<Rcpp::LogicalVector> x_ = R_NilValue) {
+  if(x_.isNotNull()) {
+    Rcpp::LogicalVector x(x_.get());
+    if(x.size() > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+//' @title Use Rcpp to Apply Any on Matrix Rows
+//' @name cpp_fast_rowAny
+//' @description
+//' Computes any across matrix rows
+//' @param M_ a Nullable LogicalVector. /!\ But cast to LogicalMatrix
+//' @return a LogicalVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::LogicalVector> hpp_fast_rowAny(const Rcpp::Nullable<Rcpp::LogicalVector> M_ = R_NilValue) {
+  if(!lNotisNULL(M_)) return M_;
+  Rcpp::LogicalVector V(M_.get());
+  if(V.hasAttribute("dim")) {
+    Rcpp::IntegerVector d = V.attr("dim");
+    if(d.size() == 2) {
+      Rcpp::LogicalMatrix M(M_.get());
+      Rcpp::LogicalVector out = M(Rcpp::_, 0);
+      for(R_len_t i_col = 1; i_col < M.ncol(); i_col++) out = out | M(Rcpp::_, i_col);
+      return out; 
+    } else {
+      Rcpp::stop("hpp_fast_rowAny: input is not coercible to logical matrix");
+    }
+  }
+  return V;
+}
+
+//' @title Use Rcpp to Apply Any on List members
+//' @name cpp_fast_listAny
+//' @description
+//' Computes any across list members
+//' @param L_ a Nullable List.
+//' @return a LogicalVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::LogicalVector> hpp_fast_listAny(const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue) {
+  if(L_.isNotNull()) {
+    Rcpp::List L(L_.get());
+    Rcpp::Nullable<Rcpp::LogicalVector> bar = L[0];
+    if(lNotisNULL(bar)) {
+      Rcpp::LogicalVector out(Rcpp::clone(bar.get()));
+      for(R_len_t i = 1; i < L.size(); i++) {
+        Rcpp::LogicalVector foo = L[i];
+        if(out.size() != foo.size()) Rcpp::stop("hpp_fast_listAny: members of 'L' should have same length");
+        out = out | foo;
+      }
+      return out;
+    } else {
+      for(R_len_t i = 1; i < L.size(); i++) {
+        Rcpp::Nullable<Rcpp::LogicalVector> bar = L[i];
+        if(lNotisNULL(bar)) Rcpp::stop("hpp_fast_listAny: members of 'L' should have same length");
+      }
+    }
+  }
+  return R_NilValue;
+}
+
+//' @title Use Rcpp for Range
+//' @name cpp_fast_range
+//' @description
+//' Determines range of numeric vector
+//' @param x_ a Nullable NumericVector.
+//' @details the behaviour is the same as R base::range(x_, na.rm = TRUE, finite = TRUE) without creating warnings
+//' @return a NumericVector.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::NumericVector hpp_fast_range(const Rcpp::Nullable<Rcpp::NumericVector> x_ = R_NilValue) {
+  double xmax = R_NegInf, xmin = R_PosInf;
+  if(nNotisNULL(x_)) {
+    Rcpp::NumericVector x(x_.get());
+    for(R_len_t i = 0; i < x.size(); i++) {
+      if((x[i] != NA_REAL) && (x[i] != R_NaN) && (x[i] != R_NegInf) && (x[i] != R_PosInf)) {
+        if(x[i] > xmax) xmax = x[i];
+        if(x[i] < xmin) xmin = x[i]; 
+      }
+    }
+  }
+  if(xmin > xmax) return Rcpp::NumericVector::create(xmax, xmin);
+  return Rcpp::NumericVector::create(xmin, xmax);
+}
+
+//' @title Use Rcpp for Sampling
+//' @name cpp_fast_sample
+//' @description
+//' Create a sample of integers
+//' @param n a R_len_t, max number integers to choose from.
+//' @param size a R_len_t the desired size of return integers.
+//' @param replace a bool determining if sampling should be done with replacement. Default is false.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::IntegerVector hpp_fast_sample(const R_len_t n = 0,
+                                    const R_len_t size = 0,
+                                    const bool replace = false) {
+  return Rcpp::sample(n, size, replace);
+}
+
+//' @title Get Bytes Order
+//' @name cpp_get_bytes_order
+//' @description
+//' This function expands bytes order to the whole data
+//' @param obj number of objects in the data.
+//' @param byt_ IntegerVector of number of bytes to take from 'ord_'.
+//' @param ord_ IntegerVector bytes order.
+//' @param rev bool whether to reverse order or not. Default is false.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::IntegerVector> hpp_get_bytes_order (const R_len_t obj = 0,
+                                                         const Rcpp::Nullable<Rcpp::IntegerVector> byt_ = R_NilValue,
+                                                         const Rcpp::Nullable<Rcpp::IntegerVector> ord_ = R_NilValue,
+                                                         const bool rev = false) {
+  if(iNotisNULL(byt_) && iNotisNULL(ord_) && (obj > 0)) {
+    Rcpp::IntegerVector byt(byt_.get());
+    Rcpp::IntegerVector ord(ord_.get());
+    Rcpp::IntegerVector alw = Rcpp::IntegerVector::create(1,2,3,4,5,6,7,8);
+    R_len_t n = 0;
+    Rcpp::List L(byt.size());
+    for(R_len_t i = 0; i < byt.size(); i++) {
+      if(!is_true(any(byt[i] == alw))) Rcpp::stop("hpp_get_bytes_order: 'byt' contains not allowed value:");
+      if(byt[i] > ord.size()) Rcpp::stop("hpp_get_bytes_order: required 'byt' length is larger than provided 'ord'");
+      Rcpp::IntegerVector v = Rcpp::no_init(byt[i]); 
+      if(rev) {
+        for(R_len_t j = ord.size() - byt[i]; j < ord.size(); j++) v[j - (ord.size() - byt[i])] = ord[j];
+      } else {
+        for(R_len_t j = 0; j < byt[i]; j++) v[j] = ord[j];
+      }
+      L[i] = v;
+      n += byt[i];
+    }
+    Rcpp::IntegerVector out = Rcpp::no_init(obj * n);
+    R_len_t k = 0;
+    for(R_len_t g = 0; g < obj; g++) {
+      for(R_len_t i = 0; i < byt.size(); i++) {
+        Rcpp::IntegerVector v = L(i);
+        for(R_len_t j = 0; j < v.size(); j++) {
+          out[k + j] = v[j] + k;
+        }
+        k += byt[i];
+      }
+    }
+    return out;
+  }
+  return R_NilValue;
+}
+
 // converts unsigned short to string
 std::string to_string(const uint16_t x) {
   std::string out;
@@ -85,19 +243,46 @@ std::string to_string(const uint16_t x) {
   return out;
 }
 
+//' @title Non Finite Values Replacement
+//' @name cpp_replace_non_finite
+//' @description
+//' This function replaces non finite values (NA, NaN -Inf and +Inf)
+//' @param V a NumericVector.
+//' @param by a double used as replacement value. Default is 0.0
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+Rcpp::Nullable<Rcpp::NumericVector> hpp_replace_non_finite(const Rcpp::Nullable<Rcpp::NumericVector> V_ = R_NilValue,
+                                                           const double by = 0.0) {
+  if(nNotisNULL(V_)) {
+    Rcpp::NumericVector V(V_.get());
+    Rcpp::NumericVector out = Rcpp::no_init(V.size()); // new
+    Rcpp::LogicalVector a = is_infinite(V);
+    Rcpp::LogicalVector b = is_nan(V);
+    for(R_len_t i = 0; i < V.size(); i++) {
+      out[i] = (a[i] | b[i]) ? by : V[i];
+    }
+    return out;
+  }
+  return V_;
+}
+
 // determines range of a numeric vector AND ensures that it is of finite values.
 // minimal value will be clipped to -4095.0
 Rcpp::NumericVector hpp_check_range(const Rcpp::NumericVector x) {
   double Min = R_PosInf, Max = R_NegInf;
   if(nNotisNULL(x)) {
+    Rcpp::LogicalVector a = is_infinite(x);
+    Rcpp::LogicalVector b = is_nan(x);
     for(R_len_t i = 0; i < x.size(); i++) {
-      if(!Rcpp::traits::is_finite<REALSXP>(x[i])) Rcpp::stop("hpp_check_range: 'x' contains non-finite values");
+      if(a[i] | b[i]) Rcpp::stop("hpp_check_range: 'x' contains non-finite values");
       if((x[i] < Min) && (x[i] > -4095.0)) Min = x[i];
       if(x[i] > Max) Max = x[i];
     }
   } else {
     Rcpp::stop("hpp_check_range: 'x' is empty");
   }
+  if(Min > Max) return Rcpp::NumericVector::create(Max, Min); // New
   return Rcpp::NumericVector::create(Min, Max);
 }
 

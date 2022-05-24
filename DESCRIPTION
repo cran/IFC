@@ -2,8 +2,8 @@ Package: IFC
 Encoding: UTF-8
 Type: Package
 Title: Tools for Imaging Flow Cytometry
-Version: 0.1.2
-Date: 2021-10-12
+Version: 0.1.5
+Date: 2022-05-24
 Maintainer: Yohann Demont <git.demont@gmail.com>
 Authors@R: c(person(given = 'Yohann', family = 'Demont', email = 'git.demont@gmail.com', role = c('aut', 'cre')), person(given = 'Gautier', family = 'Stoll', role = 'ctb'), person(given = 'Guido', family = 'Kroemer', role = 'ldr'), person(given = 'Jean-Pierre', family = 'Marolleau', role = 'ldr'), person(given = 'Loïc', family = 'Garçon', role = 'ldr'))
 BugReports: https://github.com/gitdemont/IFC/issues
@@ -19,11 +19,11 @@ LinkingTo: Rcpp, RcppProgress
 Additional_repositories: https://gitdemont.github.io/IFCdata/
 RoxygenNote: 7.1.1
 NeedsCompilation: yes
-Packaged: 2021-10-12 10:41:06 UTC; Amnis
+Packaged: 2022-05-24 10:00:36 UTC; Amnis
 Author: Yohann Demont [aut, cre],
   Gautier Stoll [ctb],
   Guido Kroemer [ldr],
   Jean-Pierre Marolleau [ldr],
   Loïc Garçon [ldr]
 Repository: CRAN
-Date/Publication: 2021-10-13 20:10:10 UTC
+Date/Publication: 2022-05-24 23:40:13 UTC

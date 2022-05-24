@@ -48,7 +48,7 @@
 #' @param verbose whether to display information (use for debugging purpose). Default is FALSE.
 #' @param ... other arguments to be passed.
 #' @details Partial implementation of ISAC's Gating-ML 2.0 data exchange standard for gating description.
-#' See Josef Spidlen et al. Cytometry A 87 683-687 (2015). \url{https://onlinelibrary.wiley.com/doi/full/10.1002/cyto.a.22690}\cr
+#' See Josef Spidlen et al. Cytometry A 87 683-687 (2015). \doi{10.1002/cyto.a.22690}\cr
 #' GatingML is partly implemented because:\cr
 #' -Tagged population are not part of GatingML gates\cr
 #' -IDEAS/INSPIRE regions are different from the collection of gates listed in GatingML. Notably,\cr
@@ -100,7 +100,7 @@ writeGatingStrategy = function(obj, write_to, overwrite = FALSE,
     write_to = normalizePath(write_to, winslash = "/", mustWork = FALSE)
     if(!overwrite) stop(paste0("file ",write_to," already exists"))
     if(tolower(fileName) == tolower(write_to)) stop("you are trying to overwrite source file which is not allowed")
-    xmlEND_export = cpp_scanFirst(fname = write_to, target = "</gating:Gating-ML>", start = 0, end = 0)
+    xmlEND_export = cpp_scanFirst(write_to, charToRaw('</gating:Gating-ML>'), start = 0, end = 0)
     if(xmlEND_export > 0) {
       xml_export = read_xml(readBin(con = write_to, what = "raw", n = xmlEND_export + nchar("</gating:Gating-ML>") - 1),
                             options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
