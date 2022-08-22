@@ -107,9 +107,9 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
   display_progress = as.logical(display_progress); assert(display_progress, len = 1, alw = c(TRUE, FALSE))
   force_default = as.logical(force_default); assert(force_default, len = 1, alw = c(TRUE, FALSE))
   recursive = as.logical(recursive); assert(recursive, len = 1, alw = c(TRUE, FALSE))
+  fileName = enc2native(normalizePath(fileName, winslash = "/", mustWork = FALSE))
   endianness = cpp_checkTIFF(fileName)
   IFD = getIFD(fileName = fileName, offsets = "first", trunc_bytes = 8, verbose = verbose, verbosity = verbosity, force_trunc = FALSE, bypass = FALSE, ...)
-  fileName = normalizePath(fileName, winslash = "/", mustWork = FALSE)
   title_progress = basename(fileName)
   
   ##### Initializes values
@@ -169,7 +169,7 @@ ExtractFromXIF <- function(fileName, extract_features = TRUE, extract_images = F
       onefile = TRUE
     }
   }
-  tmp = read_xml(getFullTag(IFD = IFD, which = 1, "33027"), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
+  tmp = read_xml(getFullTag(IFD = IFD, which = 1, tag = "33027", raw = TRUE), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
   acquisition = list("Illumination"=lapply(as_list(xml_find_first(tmp, "//Illumination")), unlist),
                      "Imaging"=lapply(as_list(xml_find_first(tmp, "//Imaging")), unlist),
                      "Display"=lapply(as_list(xml_find_first(tmp, "//Display")), unlist))

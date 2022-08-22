@@ -125,17 +125,17 @@ objectExtract <- function(ifd,
     if(length(ifd) == 0) stop("'ifd' can't be missing")
     if("IFC_first_ifd" %in% class(ifd)) stop("can't extract object from 'ifd' of class `IFC_first_ifd`")
     if(length(param) == 0) {
+      dots = dots[names(dots) %in% c("fileName", "verbose")]
       if((length(fileName) == 0) && (length(info) == 0)) {
-        param = do.call(what = "objectParam", args = c(list(fileName = attr(ifd, "fileName_image"),
-                                                            verbose = verbose), dots))
+        param = do.call(what = "objectParam", args = c(list(fileName = attr(ifd, "fileName_image"), verbose = verbose), dots))
       } else {
-        param = do.call(what = "objectParam", args = c(list(verbose = verbose), dots))
+        dots = dots[names(dots) %in% c("info")]
+        param = do.call(what = "objectParam", args = c(list(verbose = verbose, info = info, fileName = fileName), dots))
       }
     } else {
       if(attr(ifd, "checksum") != param$checksum) stop("'ifd' and 'param' do not match, please ensure that they originate from same file")
     }
   }
-  
   # create dir to export files
   if(param$export == "file") if(!dir.exists(param$dir_name)) if(!dir.create(param$dir_name, recursive = TRUE, showWarnings = FALSE)) stop(paste0("can't create\n", param$dir_name))
   
@@ -162,9 +162,9 @@ objectExtract <- function(ifd,
     spatialY = spatialX
   }
 
-  # extract
+  # extracts
   foo = lapply(1:l_ifd, FUN=function(i_ifd) {
-    img = cpp_extract(fname = param$fileName_image, 
+    img = cpp_extract(fname = enc2native(param$fileName_image), 
                       ifd = ifd[[i_ifd]], 
                       colors = param$colors,  
                       physicalChannel = channels$physicalChannel,

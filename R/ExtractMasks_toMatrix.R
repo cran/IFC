@@ -58,9 +58,9 @@ ExtractMasks_toMatrix <- function(...,
   offsets = input[["offsets"]]
   param = input[["param"]]
   if(length(offsets) == 0) {
-    fileName = input[["fileName"]]
+    fileName = enc2native(input[["fileName"]])
   } else {
-    fileName = attr(offsets, "fileName_image")
+    fileName = enc2native(attr(offsets, "fileName_image"))
   }
   
   # check mandatory param
@@ -112,6 +112,7 @@ ExtractMasks_toMatrix <- function(...,
     param = input$param
     param$export = "matrix"
   }
+  param$fileName_image = enc2native(param$fileName_image)
   fileName = param$fileName_image
   title_progress = basename(fileName)
   
@@ -192,7 +193,7 @@ ExtractMasks_toMatrix <- function(...,
   }
   ids = as.integer(gsub("^.*_(.*)$", "\\1", sapply(ans, attr, which="offset_id")))
   if(length(ids) != 0) if(!all(objects == ids)) warning("Extracted object_ids differ from expected ones. Concider running with 'fast' = FALSE", call. = FALSE, immediate. = TRUE)
-  names(ans) = objects
+  names(ans) = num_to_string(objects)
   attr(ans, "channel_id") <- channel_id
   return(ans)
 }

@@ -58,7 +58,7 @@ getImagesValues <- function(fileName, offsets, objects, display_progress = FALSE
   display_progress = as.logical(display_progress); assert(display_progress, len = 1, alw = c(TRUE, FALSE))
   IFD = getIFD(fileName = fileName, offsets = "first", trunc_bytes = 8, force_trunc = FALSE, verbose = FALSE, verbosity = 1, bypass = FALSE, ...)
   bits = IFD[[1]]$tags$`258`$map
-  tmp = read_xml(getFullTag(IFD = IFD, which = 1, tag = "33027"), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
+  tmp = read_xml(getFullTag(IFD = IFD, which = 1, tag = "33027", raw = TRUE), options=c("HUGE","RECOVER","NOENT","NOBLANKS","NSCLEAN"))
   in_use = as.logical(as.numeric(strsplit(xml_text(xml_find_first(tmp, "//Imaging//ChannelInUseIndicators_0_11")), " ", useBytes = TRUE, fixed=TRUE)[[1]]))
   rm(tmp)
   chan_number = sum(in_use)
@@ -169,7 +169,7 @@ getImagesValues <- function(fileName, offsets, objects, display_progress = FALSE
         paste0("satpercent",(1:chan_number)))
   if(ncol(images) != length(N)) images = cbind(images, matrix(0, ncol = length(N) - ncol(images), nrow = nrow(images)))
   colnames(images) <- N
-  rownames(images) <- 1:nrow(images)
+  rownames(images) <- num_to_string(1:nrow(images))
   if(!all(objects == images$id)) warning("Extracted object_ids differ from expected ones. Concider running with 'fast' = FALSE", call. = FALSE, immediate. = TRUE)
   class(images) <- c("data.frame", "IFC_images")
   return(images)

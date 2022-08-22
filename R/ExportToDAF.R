@@ -103,7 +103,7 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
   if(ntry < 0) ntry = 0
   assert(fullname, len=1, alw=c(TRUE, FALSE))
   
-  fileName = normalizePath(fileName, winslash = "/", mustWork = FALSE)
+  fileName = enc2native(normalizePath(fileName, winslash = "/", mustWork = FALSE))
   splitf_obj = splitf(fileName)
   splitp_obj = splitp(write_to)
   write_to = formatn(splitp_obj, splitf_obj)
@@ -111,10 +111,9 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
   assert(file_extension, len = 1, alw = "daf")
   if(any(splitp_obj$channel > 0)) message("'write_to' has %c argument but channel information can't be retrieved with ExportToDAF()")
   if(any(splitp_obj$object > 0)) message("'write_to' has %o argument but channel information can't be retrieved with ExportToDAF()")
-
   overwritten = FALSE
   if(file.exists(write_to)) {
-    write_to = normalizePath(write_to, winslash = "/")
+    write_to = enc2native(normalizePath(write_to, winslash = "/"))
     if(!overwrite) stop(paste0("file ",write_to," already exists"))
     if(tolower(fileName) == tolower(write_to)) stop("you are trying to overwrite source file which is not allowed")
     xmlEND_export = cpp_scanFirst(write_to, charToRaw('</Assay>'), start = 0, end = 0)
@@ -130,7 +129,6 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
     tmp_file = tempfile()
     overwritten = TRUE
   }
-  
   dir_name = dirname(write_to)
   if(!dir.exists(dir_name)) if(!dir.create(dir_name, recursive = TRUE, showWarnings = FALSE)) stop(paste0("can't create\n", dir_name))
   file_w = ifelse(overwritten, tmp_file, write_to)
@@ -247,6 +245,9 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
     stop(paste0(ifelse(overwritten,"temp ","'write_to' "), "file: ", file_w, "\ncan't be created: check name ?"))
   })
   write_to = normalizePath(write_to, winslash = "/", mustWork = FALSE)
+  raw_3e = as.raw(0x3e)
+  raw_00 = as.raw(0x00)
+  raw_2020 = as.raw(c(0x20,0x20))
   tryCatch(expr = {
     # extracts extra characters separating nodes and initializes nodes
     collapse = lapply(names(toskip), FUN=function(x) as.raw(c()))
@@ -257,8 +258,8 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
         k = toskip[i]-1
         seek(toread, k)
         B = readBin(toread, what="raw", n=1)
-        while(B != as.raw(0x3e)) {
-          collapse[[i]]=c(B,collapse[[i]])
+        while(B != raw_3e) {
+          if(B != raw_00) collapse[[i]]=c(B,collapse[[i]])
           k=k-1
           seek(toread, k)
           B = readBin(toread, what="raw", n=1)
@@ -302,36 +303,38 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
                                  sapply(feat$val, FUN=function(x) writeBin(object=as.double(x), con=raw(), size = 8, endian = endianness, useBytes = TRUE)))
         } else {
           new_nodes$features = c(new_nodes$features,
-                                 as.raw(c(0x20,0x20)),
+                                 raw_2020,
                                  charToRaw(sprintf('<UDFValues fid="%s" fv="%s" />', num_to_string(fid), paste0(num_to_string(feat$val), collapse = "|"))),
-                                 as.raw(c(0x20,0x20)),
+                                 raw_2020,
                                  collapse$features)
         }
         fid=fid+1
         new_nodes$features_def = c(new_nodes$features_def,
-                                   as.raw(c(0x20,0x20)),
+                                   raw_2020,
                                    charToRaw(sprintf('<UDF name="%s" type="%s" userfeaturetype="%s" def="%s" />', feat[["name"]], feat[["type"]], feat[["userfeaturetype"]], feat[["def"]])),
-                                   as.raw(c(0x20,0x20)),
+                                   raw_2020,
                                    collapse$features_def)
         }
     }
     if(length(regions)!=0) for(i in 1:length(regions)) {
       reg = regions[[i]]
+      reg = reg[sapply(reg, length) != 0]
       if(verbose) cat(paste0("creating region: ", reg$label, "\n"))
       if(reg$label%in%regions_daf_label) {
         warning(paste0(reg$label, ", not exported: trying to export an already defined region"), immediate. = TRUE, call. = FALSE)
         next
       }
       new_nodes$regions = c(new_nodes$regions,
-                            as.raw(c(0x20,0x20)),
-                            charToRaw(to_xml_list(reg[-which(names(reg)%in%c("x","y"))], name = "Region", escape = rawToChar(c(collapse$regions,as.raw(c(0x20,0x20)))),
+                            raw_2020,
+                            charToRaw(to_xml_list(reg[-which(names(reg)%in%c("x","y"))], name = "Region", escape = rawToChar(c(collapse$regions,raw_2020)),
                                                   kids = lapply(1:length(reg$x), FUN=function(k) to_xml_list(x=list("x"=num_to_string(reg$x[k]), "y"=num_to_string(reg$y[k])), name="axy")))),
-                            as.raw(c(0x20,0x20)),
+                            raw_2020,
                             collapse$regions)
     }
     pops_alw = c()
     if(length(pops)!=0) for(i in 1:length(pops)) {
       pop = pops[[i]]
+      pop = pop[sapply(pop, length) != 0]
       if(verbose) cat(paste0("creating population: ", pop$name, "\n"))
       if(pop$name%in%pops_daf) {
         warning(paste0(pop$name, ", not exported: trying to export an already defined population"), immediate. = TRUE, call. = FALSE)
@@ -372,20 +375,20 @@ ExportToDAF <- function(fileName, write_to, pops = list(), regions = list(), fea
             next
           }
           if(obj_number != length(pop$obj)) stop(paste0("trying to export a tagged population with element(s) outside of objects acquired: ", pop$name))
-          new_node_pop = to_xml_list(pop[-which(names(pop)%in%c("obj"))], name = "Pop", escape = rawToChar(c(collapse$pops,as.raw(c(0x20,0x20)))),
+          new_node_pop = to_xml_list(pop[-which(names(pop)%in%c("obj"))], name = "Pop", escape = rawToChar(c(collapse$pops,raw_2020)),
                                      kids = lapply(num_to_string(which(pop$obj)-1), FUN=function(ob) to_xml_list(name="ob", x=list("O"=ob))))
         }
         if(K%in% c("double","integer")) {
           if((obj_number <= max(pop$obj)) | (min(pop$obj) < 0) | any(duplicated(pop$obj))) stop(paste0("trying to export a tagged population with element(s) outside of objects acquired: ", pop$name))
-          new_node_pop = to_xml_list(pop[-which(names(pop)%in%c("obj"))], name = "Pop", escape = rawToChar(c(collapse$pops,as.raw(c(0x20,0x20)))),
+          new_node_pop = to_xml_list(pop[-which(names(pop)%in%c("obj"))], name = "Pop", escape = rawToChar(c(collapse$pops,raw_2020)),
                                      kids = lapply(num_to_string(pop$obj), FUN=function(ob) to_xml_list(name="ob", x=list("O"=ob))))
         }
       }
       pops_alw = c(pops_alw, i)
       new_nodes$pops = c(new_nodes$pops,
-                         as.raw(c(0x20,0x20)), 
+                         raw_2020, 
                          charToRaw(new_node_pop),
-                         as.raw(c(0x20,0x20)),
+                         raw_2020,
                          collapse$pops)
     }
     pops = pops[pops_alw]

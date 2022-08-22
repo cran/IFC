@@ -94,9 +94,9 @@ ExportToNumpy <- function(...,
   offsets = input[["offsets"]]
   param = input[["param"]]
   if(length(offsets) == 0) {
-    fileName = input[["fileName"]]
+    fileName = enc2native(input[["fileName"]])
   } else {
-    fileName = attr(offsets, "fileName_image")
+    fileName = enc2native(attr(offsets, "fileName_image"))
   }
   
   # check mandatory param
@@ -187,7 +187,7 @@ ExportToNumpy <- function(...,
       param$size <- size
     }
   }
-  
+  param$fileName_image = enc2native(param$fileName_image)
   fileName = param$fileName_image
   title_progress = basename(fileName)
   file_extension = getFileExt(fileName)
@@ -352,7 +352,7 @@ ExportToNumpy <- function(...,
          {
            ret = aperm(array(unlist(ans), dim = c(nrow(ans[[1]][[1]]), ncol(ans[[1]][[1]]), length(ans[[1]]), length(objects))), perm = c(4,1,2,3))
          })
-  dimnames(ret) = list("object" = ids,
+  dimnames(ret) = list("object" = num_to_string(ids),
                        "height" = NULL,
                        "width" = NULL,
                        "channel" = channel_id)

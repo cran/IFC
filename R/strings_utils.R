@@ -110,15 +110,17 @@ protectn <- function(name) {
 #' @param definition population definition to be splitted
 #' @param all_names the names of all allowed populations
 #' @param operators operators used. Default is c("And", "Or", "Not", "(", ")").
+#' @param split string used for splitting. Default is "|".
 #' @keywords internal
-splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(", ")")) {
+splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(", ")"), split = "|") {
   assert(definition, len=1, typ="character")
   assert(all_names, typ="character")
   assert(operators, typ="character")
+  assert(split, len=1, typ="character")
   
   # we create a mapping between all_names and random names
   # we also ensure that random names will not contain any specials and 
-  # will not match with themselves nor with names or operators to substitute
+  # will not match with themselves nor with names or operators or split to substitute
   # we also order to_substitute by number of character (decreasing) to
   # be sure that longer words will be substitute first
   to_substitute = all_names
@@ -129,7 +131,7 @@ splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(",
     foo = c()
     while((length(foo) == 0) ||
           any(unlist(lapply(to_substitute, FUN = function(x) grepl(pattern=x, x=foo, fixed=TRUE))))) {
-      foo = random_name(n=max(9,nchar(operators))+1, special = NULL, forbidden = c(replace_with, to_substitute, operators)) 
+      foo = random_name(n=max(9,nchar(operators))+1, special = NULL, forbidden = c(replace_with, to_substitute, operators, split)) 
     }
     replace_with = c(replace_with, foo)
   }
@@ -140,9 +142,9 @@ splitn <- function(definition, all_names, operators = c("And", "Or", "Not", "(",
     ans = gsub(pattern = to_substitute[i], replacement = replace_with[i], x = ans, fixed = TRUE)
   }
   
-  # we can now split the definition with "|" since random names we use
-  # do not contain this special character
-  ans = strsplit(ans, split = "|", fixed = TRUE)[[1]]
+  # we can now split the definition since random names we use
+  # do not contain split
+  ans = strsplit(ans, split = split, fixed = TRUE)[[1]]
   
   # finally, can replace random names with their corresponding initial names
   # from to_substitute (i.e. all_names + operators)
@@ -362,21 +364,22 @@ num_to_string <- function(x, precision = 22) {
 #' Helper to define next allowed component in a boolean vector.
 #' @param x a string, current component.
 #' @param count an integer, representing current number of opened/closed bracket.
+#' @param obj_alias a string, alias used for population name.
 #' @return a vector of next allowed components.
 #' @keywords internal
-next_bool = function(x = "", count = 0L) {
+next_bool = function(x = "", count = 0L, obj_alias) {
   return(switch(x,
                 "And" = {
-                  c("Not", "(", "obj")
+                  c("Not", "(", obj_alias)
                 },
                 "Or" = {
-                  c("Not", "(", "obj")
+                  c("Not", "(", obj_alias)
                 },
                 "Not" = {
-                  c("(", "obj")
+                  c("(", obj_alias)
                 },
                 "(" = {
-                  c("Not", "(", "obj")
+                  c("Not", "(", obj_alias)
                 },
                 ")" = {
                   tmp = c("And", "Or")
@@ -401,17 +404,18 @@ validate_bool = function(x = "", all_names = "") {
   operators = c("And", "Or", "Not", "(", ")")
   all_names = setdiff(all_names, c(operators, ""))
   if(!any(all_names %in% x)) stop("object definition is not possible: no match found")
+  obj_alias = random_name(special = NULL, forbidden = unique(c("", operators, all_names, x)))
   count = 0L
-  alw = c("Not", "(", "obj")
+  alw = c("Not", "(", obj_alias)
   lapply(1:length(x), FUN = function(i) {
     if(x[i] == "(") count <<- count + 1L
     if(x[i] == ")") count <<- count - 1L
     if(x[i] %in% alw) {
-      alw <<- next_bool(x[i], count)
+      alw <<- next_bool(x[i], count, obj_alias)
       return(NULL)
     } else {
-      if(("obj" %in% alw) && (x[i] %in% all_names)) {
-        alw <<- next_bool(x[i], count)
+      if((obj_alias %in% alw) && (x[i] %in% all_names)) {
+        alw <<- next_bool(x[i], count, obj_alias)
         return(NULL)
       }
     }

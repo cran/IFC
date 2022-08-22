@@ -11,13 +11,13 @@ Contains several tools to treat Imaging Flow Cytometry data from ImageStream(R) 
 \details{
 The IFC package provides several categories of functions:\cr
 - to read / write / export / visualize:\cr
-\code{\link{readIFC}}, \code{\link{writeIFC}}, \code{\link{ExtractFromDAF}}, \code{\link{ExportToDAF}}, \code{\link{data_to_DAF}}, \code{\link{ExtractFromXIF}}, \code{\link{ExportToXIF}}, \code{\link{ExtractFromFCS}}, \code{\link{ExportToFCS}}, \code{\link{ExportToBATCH}}, \code{\link{ExportToReport}}, \code{\link{ExportToGallery}}, \code{\link{ExportToNumpy}}, \code{\link{DisplayGallery}}, \code{\link{ExtractImages_toBase64}}, \code{\link{ExtractImages_toFile}}, \code{\link{ExtractImages_toMatrix}}, \code{\link{ExtractMasks_toMatrix}}, \code{\link{objectExtract}}, \code{\link{popsNetwork}}, \code{\link{plotGraph}}, \code{\link{paletteIFC}}, \code{\link{autoplot}}\cr
+\code{\link{readIFC}}, \code{\link{writeIFC}}, \code{\link{ExtractFromDAF}}, \code{\link{ExportToDAF}}, \code{\link{data_to_DAF}}, \code{\link{ExtractFromXIF}}, \code{\link{ExportToXIF}}, \code{\link{ExtractFromFCS}}, \code{\link{ExportToFCS}}, \code{\link{ExportToBATCH}}, \code{\link{BatchReport}}, \code{\link{ExportToReport}}, \code{\link{ExportToGallery}}, \code{\link{ExportToNumpy}}, \code{\link{DisplayGallery}}, \code{\link{ExtractImages_toBase64}}, \code{\link{ExtractImages_toFile}}, \code{\link{ExtractImages_toMatrix}}, \code{\link{ExtractMasks_toMatrix}}, \code{\link{objectExtract}}, \code{\link{popsNetwork}}, \code{\link{plotGraph}}, \code{\link{paletteIFC}}, \code{\link{autoplot}}\cr
 - to transform features values\cr
 \code{\link{smoothLinLog}}, \code{\link{inv_smoothLinLog}}\cr
 - to deeply extract information from files:\cr
 \code{\link{getInfo}}, \code{\link{getOffsets}}, \code{\link{getIFD}}, \code{\link{getFullTag}}, \code{\link{getAborted}}\cr
 - dedicated to populations:\cr
-\code{\link{popsCopy}}, \code{\link{popsGetObjectsIds}}, \code{\link{popsNetwork}}\cr
+\code{\link{popsCopy}}, \code{\link{popsGetObjectsIds}}, \code{\link{popsNetwork}}, \code{\link{popsRename}}\cr
 - for adding  / removing features, regions, populations:\cr
 \code{\link{data_add_features}}, \code{\link{data_add_regions}}, \code{\link{data_add_pops}}, \code{\link{data_rm_features}}, \code{\link{data_rm_regions}}, \code{\link{data_rm_pops}}\cr
 - to allow several coercion:\cr

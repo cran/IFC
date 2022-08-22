@@ -60,9 +60,9 @@ ExtractImages_toBase64 <- function(...,
   offsets = input[["offsets"]]
   param = input[["param"]]
   if(length(offsets) == 0) {
-    fileName = input[["fileName"]]
+    fileName = enc2native(input[["fileName"]])
   } else {
-    fileName = attr(offsets, "fileName_image")
+    fileName = enc2native(attr(offsets, "fileName_image"))
   }
   
   # check mandatory param
@@ -117,6 +117,7 @@ ExtractImages_toBase64 <- function(...,
     param$export = "base64"
     param$mode = mode
   }
+  param$fileName_image = enc2native(param$fileName_image)
   fileName = param$fileName_image
   title_progress = basename(fileName)
   
@@ -197,7 +198,7 @@ ExtractImages_toBase64 <- function(...,
   }
   ids = sapply(ans, attr, which="object_id")
   if(!all(objects == ids)) warning("Extracted object_ids differ from expected ones. Concider running with 'fast' = FALSE", call. = FALSE, immediate. = TRUE)
-  names(ans) = objects
+  names(ans) = num_to_string(objects)
   attr(ans, "channel_id") <- channel_id
   return(ans)
 }
