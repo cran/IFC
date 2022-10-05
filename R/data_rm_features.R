@@ -34,7 +34,10 @@
 #' @param features a character vector of features names to remove within 'obj'. Note that "Object Number" is not allowed and will be excluded from 'features' if present.
 #' @param list_only whether to return a list of elements that will be impacted by the removal. Default is TRUE.
 #' If FALSE then modified object will be returned.
-#' @param adjust_graph whether to try to adjust graph when possible. Default is TRUE.
+#' @param adjust_graph whether to try to adjust graph(s) when possible. Default is TRUE.\cr
+#' -TRUE, graph(s) will be kept if possible using only regions, pops it depends that can be found in 'obj',\cr
+#' -FALSE, graph(s) will be kept only if all features, regions, pops it refers to are found in 'obj',\cr
+#' -NA, graph(s) will be removed no matter if features, regions, pops it refers to are found in 'obj'.
 #' @param ... Other arguments to be passed.
 #' @return an `IFC_data` object or a list of elements impacted by removal depending on 'list_only' parameter.
 #' @export
@@ -89,15 +92,21 @@ data_rm_features <- function(obj, features, list_only = TRUE, adjust_graph = TRU
   }
   
   # search for features depending on input features
+  all_names = names(obj$features)
+  alt_names = gen_altnames(all_names)
   L = length(to_remove_features)
   LL = L - 1
   while(L != LL) {
     L = length(to_remove_features)
-    to_find = sapply(to_remove_features, protectn)
-    to_find = substr(to_find, 2, nchar(to_find) - 1)
+    to_find = to_remove_features
     for(i in 1:length(obj$features_def)) {
-      # if((obj$features_def[[i]]$type == "combined") && any(to_remove_features %in% strsplit(obj$features_def[[i]]$def, split = "|", fixed = TRUE)[[1]])) {
-      if((obj$features_def[[i]]$type == "combined") && any(sapply(to_find, grepl, obj$features_def[[i]]$def))) {
+      if((obj$features_def[[i]]$type == "combined") &&
+         any(to_remove_features %in% splitn(definition = obj$features_def[[i]]$def,
+                                            all_names = all_names,
+                                            alt_names = alt_names,
+                                            operators = c("+", "-", "*", "/", "(", ")", "ABS", "COS", "SIN", "SQR", "SQRT"),
+                                            split = "|",
+                                            scalar = TRUE))) {
         to_remove_features = c(to_remove_features, obj$features_def[[i]]$name)
       }
     }
@@ -176,6 +185,6 @@ data_rm_features <- function(obj, features, list_only = TRUE, adjust_graph = TRU
   pops_back = obj$pops
   obj$pops = list()
   obj = data_add_pops(obj, pops = pops_back[!(names(pops_back) %in% to_remove_pops)], ...)
-  if(length(to_remove_graphs) != 0) return(adjustGraph(obj = obj, selection = to_remove_graphs, adjust_graph = adjust_graph))
+  obj = data_rm_graphs(obj = obj, graphs = to_remove_graphs, list_only = list_only, adjust_graph = adjust_graph)
   return(obj)
 }

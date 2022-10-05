@@ -44,14 +44,14 @@
 #' -- data_beg: where to retrieve file text segment beginning. Default is list(at = 26, n = 8),\cr
 #' -- data_end: where to retrieve file text segment end.       Default is list(at = 34, n = 8),\cr
 #' - apply_scale, whether to apply data scaling. It only applies when fcs file is stored as DATATYPE "I". Default is TRUE.\cr
-#' - first_only, whether to extract only the first dataset when several. Default is TRUE.\cr
+#' - dataset, (coerced to) an ordered vector of unique indices of desired dataset(s) to extract. Default is 1 to extract only the first dataset, whereas NULL allows to extract all available datasets.\cr
 #' - force_header, whether to force the use of header to determine the position of data segment. Default is FALSE, for using positions found in "$BEGINDATA" and "$ENDDATA" keywords.\cr
 #' - text_only, whether to only extract text segment. Default is FALSE.
 #' @param display_progress whether to display a progress bar. Default is TRUE.
 #' @param ... other arguments to be passed.
 #' @details 'options' may be tweaked according to file type, instrument and software used to generate it.\cr
 #' Default 'options' should allow to read most files.\cr
-#' 'apply_scale', 'force_header', 'first_only', and 'textt_only' can also be passed to 'options' thanks to ...
+#' 'apply_scale', 'force_header', 'dataset', and 'textt_only' can also be passed to 'options' thanks to ...
 #' @source Data File Standard for Flow Cytometry, version FCS 3.1 from Spidlen J. et al. available at \doi{10.1002/cyto.a.20825}.
 #' @return a list whose elements are lists for each dataset stored within the file.\cr
 #' each sub-list contains:\cr
@@ -66,12 +66,11 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
                                                            data_beg = list(at = 26, n = 8),
                                                            data_end = list(at = 34, n = 8)),
                                              apply_scale = TRUE,
-                                             first_only = TRUE,
+                                             dataset = 1,
                                              force_header = FALSE,
                                              text_only = FALSE),
                     display_progress = TRUE, ...) {
   dots = list(...)
-  on.exit(gc(verbose = FALSE), add = TRUE)
   if(missing(fileName)) stop("'fileName' can't be missing")
   assert(display_progress, len = 1, alw = c(TRUE,FALSE))
   assert(fileName, len = 1)
@@ -80,7 +79,7 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
   title_progress = basename(fileName)
   
   # ensure options names are valid
-  if(!identical(sort(names(options)), c("apply_scale", "first_only", "force_header", "header", "text_only"))) stop("'options' should be a named list containing \"header\", \"apply_scale\", \"first_only\", \"force_header\", and \"text_only\" entries")
+  if(!identical(sort(names(options)), c("apply_scale", "dataset", "force_header", "header", "text_only"))) stop("'options' should be a named list containing \"header\", \"apply_scale\", \"dataset\", \"force_header\", and \"text_only\" entries")
   if(!identical(sort(names(options$header)), c("data_beg", "data_end", "start", "text_beg", "text_end"))) stop("'options$header' should be a named list containing \"start\", \"text_beg\", \"text_end\", \"data_beg\", and \"data_end\" entries")
   if(!(all(sapply(options$header, FUN = function(x) identical(sort(names(x)), c("at","n")))))) stop("each 'options$header' members should be a named list containing \"at\" and \"n\" entries")
   
@@ -107,11 +106,12 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
   
   # check if we can find options arguments in dots
   if("text_only" %in% names(dots)) options$text_only <- dots$text_only
-  if("first_only" %in% names(dots)) options$first_only <- dots$first_only
+  if("dataset" %in% names(dots)) options$dataset <- dots$dataset
   if("apply_scale" %in% names(dots)) options$apply_scale <- dots$apply_scale
   if("force_header" %in% names(dots)) options$force_header <- dots$force_header
   assert(options[["text_only"]], len = 1, alw = c(TRUE, FALSE))
-  assert(options[["first_only"]], len = 1, alw = c(TRUE, FALSE))
+  options[["dataset"]] = sort(unique(unname(options[["dataset"]])), na.last = FALSE)
+  if(length(options[["dataset"]]) == 0) options[["dataset"]] = integer()
   assert(options[["apply_scale"]], len = 1, alw = c(TRUE, FALSE))
   assert(options[["force_header"]], len = 1, alw = c(TRUE, FALSE))
   
@@ -202,7 +202,12 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
   data_bytes = off2 - off1 + 1
   # prepare default returned value for data
   data = data.frame()
-  if(!options$text_only && (off2 > off1)) {
+  if(!options$text_only &&                            # use only wants text segment
+     (off2 > off1) &&                                 # data segment has no length
+     (                                                
+       (length(options$dataset) == 0) ||
+       (text[["@IFC_dataset"]] %in% options$dataset)  # no need to extract data if user doesn't need it
+     )) {
     seek(toread, off1)
     # retrieve info to extract data
     type = text[["$DATATYPE"]]
@@ -461,7 +466,6 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
       })
     }
   }
-  
   # TODO retrieve analysis segment ?
   # # we will use text to extract analysis segment offsets
   # off1 = suppressWarnings(as.integer(text[["$BEGINANALYSIS"]]))
@@ -479,14 +483,31 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
   
   # extract additional FCS set if any
   more = integer()
-  if(!options$first_only) more = suppressWarnings(na.omit(as.integer(text[["$NEXTDATA"]]) + at))
-  if((length(more) != 0) && !(more %in% options$header$start$at)) {
-    if(more < file.size(fileName)) {
-      options$header$start$at <- c(more, options$header$start$at)
-      ans = c(ans, readFCS(fileName = fileName, options = options,
-                           display_progress = display_progress, ...))
-    } else {
-      warning("can't extract all datasets: keyword $NEXTDATA points to outside of the file")
+  if((length(options$dataset) == 0) ||
+     !all(options$dataset %in% 1L)) more = suppressWarnings(na.omit(as.integer(text[["$NEXTDATA"]]) + at))
+  msg_fun <- function(tmp) {
+    if(!all(tmp)) {
+      if(!any(tmp)) stop(length(ans), " dataset", ifelse(length(ans) <= 1, "", "s") , " found; no dataset can be retrieved with options$dataset = ",paste0(options$dataset, collapse = ",")," in\n", fileName)
+      warning("dataset",ifelse(sum(!tmp)==1,"","s")," [",paste0(options$dataset[!tmp], collapse = ","),"] can't be found in\n", fileName)
+    } 
+  }
+  if(length(more) != 0) {
+    if(!(more %in% options$header$start$at)) {
+      if(more < file.size(fileName)) {
+        options$header$start$at <- c(more, options$header$start$at)
+        ans = c(ans, readFCS(fileName = fileName, options = options,
+                             display_progress = display_progress, ...))
+      } else {
+        warning("can't extract all datasets: keyword $NEXTDATA points to outside of the file")
+      }
+      if(length(options$dataset) != 0) {
+        tmp = options$dataset %in% seq_along(ans)
+        msg_fun(tmp)
+        ans = ans[options$dataset[tmp]]
+      }
+    }
+    if((length(options$header$start$at) == 1) && (length(options$dataset) != 0)) {
+      msg_fun(options$dataset %in% seq_along(ans))
     }
   }
   return(structure(ans, class = "IFC_fcs", fileName = fileName))
@@ -506,7 +527,6 @@ readFCS <- function(fileName, options = list(header = list(start = list(at = 0, 
 #' @keywords internal
 FCS_merge_dataset <- function(fcs, ...) {
   dots = list(...)
-  on.exit(gc(verbose = FALSE), add = TRUE)
   display_progress = dots$display_progress
   if(length(display_progress) == 0) display_progress = TRUE
   assert(display_progress, len=1, alw = c(TRUE, FALSE))
@@ -595,7 +615,6 @@ FCS_merge_dataset <- function(fcs, ...) {
 #' @keywords internal
 FCS_merge_sample <- function(fcs, ...) {
   dots = list(...)
-  on.exit(gc(verbose = FALSE), add = TRUE)
   display_progress = dots$display_progress
   if(length(display_progress) == 0) display_progress = TRUE
   assert(display_progress, len=1, alw = c(TRUE, FALSE))
@@ -682,6 +701,7 @@ convert_spillover <- function(spillover) {
 #' @return A named list of class `IFC_data`, whose members are:\cr
 #' -description, a list of descriptive information,\cr
 #' -Merged_fcs, character vector of path of files used to create fcs, if input was a merged,\cr
+#' -Keywords, a named-list of keywords values, only keywords from 1st 'fcs' segment will be retrieved\cr
 #' -fileName, path of fileName input,\cr
 #' -fileName_image, path of .cif image fileName is referring to,\cr
 #' -features, a data.frame of features,\cr
@@ -697,7 +717,6 @@ convert_spillover <- function(spillover) {
 FCS_to_data <- function(fcs, ...) {
   # create structure
   dots = list(...)
-  on.exit(gc(verbose = FALSE), add = TRUE)
   display_progress = dots$display_progress
   if(length(display_progress) == 0) display_progress = TRUE
   assert(display_progress, len=1, alw = c(TRUE, FALSE))
@@ -706,8 +725,9 @@ FCS_to_data <- function(fcs, ...) {
                                        "Images" = data.frame("name" = NULL, "color" = NULL, "physicalChannel" = NULL, "xmin" = NULL,
                                                              "xmax" = NULL, "xmid" = NULL, "ymid"= NULL, "scalemin"= NULL, "scalemax"= NULL,
                                                              "tokens"= NULL, "baseimage"= NULL, "function"= NULL),
-                                       "masks" = data.frame()),
+                                       "masks" = data.frame(matrix(character(),nrow = 0, ncol = 3, dimnames = list(list(),list("type","name","def"))))),
                   "Merged_fcs" = character(),
+                  "Keywords" = list(),
                   "fileName" = character(),
                   "fileName_image" = character(),
                   "features" = structure(.Data = list(), class = c("data.frame", "IFC_features")),
@@ -797,6 +817,7 @@ FCS_to_data <- function(fcs, ...) {
   min_data$fileName = normalizePath(attr(fcs, "fileName"), winslash = "/", mustWork = FALSE)
   bar <- unique(idx[, "import_file"])
   if(length(bar) > 1) min_data$Merged_fcs <- bar
+  min_data$Keywords <- fcs[[1]]$text
   min_data$description$Assay = data.frame(date = file.info(min_data$fileName)$mtime, FCS_version = paste0(FCS_version, collapse = ", "), stringsAsFactors = FALSE)
   min_data$description$ID = data.frame(file = min_data$fileName,
                                        creation = format(file.info(min_data$fileName)$ctime, format = "%d-%b-%y %H:%M:%S"),
@@ -814,10 +835,11 @@ FCS_to_data <- function(fcs, ...) {
                                 pops = list(buildPopulation(name = "All", type = "B",
                                                             color = "White", lightModeColor = "Black",
                                                             obj = rep(TRUE, obj_count))),
+                                display_progress = display_progress,
                                 session = dots$session)
   # min_data$features_comp = min_data$features[, grep("^FS.*$|^SS.*$|LOG|^Object Number$|TIME", names(min_data$features), value = TRUE, invert = TRUE, ignore.case = TRUE)]
   if(multiple) {
-    min_data = IFC::data_add_pops(obj = min_data, pops = pops, session = dots$session)
+    min_data = IFC::data_add_pops(obj = min_data, pops = pops, display_progress = display_progress, session = dots$session)
   }
   K = class(min_data$pops)
   min_data$pops = lapply(min_data$pops, FUN = function(p) {
@@ -825,25 +847,7 @@ FCS_to_data <- function(fcs, ...) {
     return(p)
   })
   class(min_data$pops) <- K
-  pops = min_data$pops
-  stats = data.frame(stringsAsFactors = FALSE,
-                     check.rows = FALSE,
-                     check.names = FALSE,
-                     t(sapply(names(pops),
-                              FUN = function(p) {
-                                count = sum(pops[[p]]$obj)
-                                base = pops[[p]]$base
-                                type = pops[[p]]$type
-                                if (base == "") base = "All"
-                                parent = sum(pops[[base]]$obj)
-                                c(type = type, parent = base, count = count,
-                                  perc_parent = count/parent * 100,
-                                  perc_tot = count/obj_count * 100)
-                              })))
-  stats[, 3] = as.numeric(stats[, 3])
-  stats[, 4] = as.numeric(stats[, 4])
-  stats[, 5] = as.numeric(stats[, 5])
-  min_data$stats = stats
+  min_data$stats = get_pops_stats(min_data$pops, obj_count)
   return(min_data)
 }
 
@@ -857,6 +861,7 @@ FCS_to_data <- function(fcs, ...) {
 #' @return A named list of class `IFC_data`, whose members are:\cr
 #' -description, a list of descriptive information,\cr
 #' -Merged_fcs, character vector of path of files used to create fcs, if input was a merged,\cr
+#' -Keywords, a named-list of keywords values, only keywords from 1st 'fcs' segment will be retrieved\cr
 #' -fileName, path of fileName input,\cr
 #' -fileName_image, path of .cif image fileName is referring to,\cr
 #' -features, a data.frame of features,\cr
@@ -872,7 +877,7 @@ FCS_to_data <- function(fcs, ...) {
 ExtractFromFCS <- function(fileName, ...) {
   # create structure
   dots = list(...)
-  dots = dots[names(dots) != "text_only"]
+  dots = dots[!(names(dots) %in% c("fcs","text_only"))]
   display_progress = dots$display_progress
   if(length(display_progress) == 0) display_progress = TRUE
   assert(display_progress, len=1, alw = c(TRUE, FALSE))
@@ -886,7 +891,7 @@ ExtractFromFCS <- function(fileName, ...) {
   }
   fcs = lapply(1:L, FUN = function(i_file) {
     if(display_progress) setPB(pb, value = i_file, title = "Extracting FCS", label = "reading files")
-    FCS_merge_dataset(do.call(what = readFCS,  args=c(dots, list(fileName = fileName[[i_file]]))))[[1]]
+    do.call(what = FCS_merge_dataset, args = c(dots, list(fcs = do.call(what = readFCS,  args=c(dots, list(fileName = fileName[[i_file]]))))))[[1]]
   })
   attr(fcs, "fileName") <- fileName[1]
   FCS_to_data(fcs, ...)
@@ -917,7 +922,7 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
   dots = list(...)
   # change locale
   locale_back = Sys.getlocale("LC_ALL")
-  on.exit(suppressWarnings({Sys.setlocale("LC_ALL", locale = locale_back); gc(verbose = FALSE)}), add = TRUE)
+  on.exit(suppressWarnings(Sys.setlocale("LC_ALL", locale = locale_back)), add = TRUE)
   suppressWarnings(Sys.setlocale("LC_ALL", locale = "English"))
   now = format(Sys.time(), format = "%d-%b-%y %H:%M:%S")
   
@@ -1038,17 +1043,16 @@ ExportToFCS <- function(obj, write_to, overwrite = FALSE, delimiter="/", cytomet
                        "@IFC_date" = now
   )
   
-  # adds extra keywords from ...
-  # removes keywords that are already in text_segment1 or that are named "session", "$BEGINDATA", "$ENDDATA" or that have no name
-  extra_keywords = setdiff(names(dots), c(names(text_segment1), "$BEGINDATA", "$ENDDATA", "session", ""))
-  # removes keywords that are already in text_segment2 ($PnN, $PnS, $PnB, $PnE, $PnR)
-  extra_keywords = grep("^\\$P\\d.*[N|S|B|E|R|]$", extra_keywords, value = TRUE, invert = TRUE)
-  # gets keywords in dots
-  extra_keywords = dots[extra_keywords]
+  # gather keywords in priority order 
+  text_segment1 = c(text_segment1, dots, obj$Keywords)
   # removes keywords whose values are NULL
-  extra_keywords = extra_keywords[sapply(extra_keywords, length) != 0]
-  # adds to text_segment1
-  text_segment1 = c(text_segment1, extra_keywords)
+  text_segment1 = text_segment1[sapply(text_segment1, nchar) != 0]
+  # removes duplicated keywords (priority order is important here)
+  text_segment1 = text_segment1[!duplicated(names(text_segment1))]
+  # removes not allowed keywords (e.g. in text_segment2 ($PnN, $PnS, $PnB, $PnE, $PnR) or session, "")
+  text_segment1 = text_segment1[setdiff(names(text_segment1),c("session", ""))]
+  text_segment1 = text_segment1[!grepl("^\\$P\\d.*[N|S|B|E|R]$", names(text_segment1))]
+
   # determines length of data
   data_length = 4 * L * nrow(features)
   

@@ -2,24 +2,34 @@
 % Please edit documentation in R/redefine_utils.R
 \name{switch_channel}
 \alias{switch_channel}
-\title{IFC_data Channel Swap}
+\title{Channel Switch}
 \usage{
-switch_channel(obj, from, to)
+switch_channel(obj, from, to, BF = TRUE, MODE = 1)
 }
 \arguments{
-\item{obj}{an `IFC_data` object. Default is missing.}
+\item{obj}{an `IFC_data` object extracted with features extracted.}
 
-\item{from, to}{integer, determining channels to swap}
+\item{from, to}{an integer index of channel. 'from' and 'to' should be different.}
 
-\item{...}{Other arguments to be passed.}
+\item{BF}{should 'from' channel be considered as brightfield. Default is TRUE.}
+
+\item{MODE}{collection mode (as retrieved by getInfo) determining the range. Default is 1.}
 }
 \value{
-an `IFC_data` object.
+a list, intended to be passed to 'new_feat_def' argument of getFromNamespace("redefine_obj", "IFC") whose members are:\cr
+-features_def, an 'IFC_features_def' object, or a list containing features definition\cr
+-masks, an 'IFC_masks' object or a data.frame containing masks definition and name.\cr
+-images, a data.frame containing images definition.
 }
 \description{
-Helper to swap channels in a `IFC_data` object.
+Switches Channel in `IFC_data` object
 }
 \details{
-it allows to apply all computation based on channel 'from' onto channel 'to', and reversely
+'BF' and 'MODE' will be used only if 'to' is not found in 'obj'.\cr
+If switching channel results in duplicated features definition, e.g. "Intensity_M01_Ch01" and "Intensity_M04_Ch04" exists in 'from'
+and user called switch_channel(obj, 4, 1). So, "Intensity_M01_Ch01" will become "Intensity_M01_Ch01" (the same) and,
+"Intensity_M04_Ch04" will become "Intensity_M01_Ch01". Meaning that resulting "Intensity_M01_Ch01" can originate from
+either "Intensity_M01_Ch01" or "Intensity_M04_Ch04". In such case duplicates will be collected in 'dup' member of attr(, "map").\cr
+/!\ Note also that 'initial' member of attr(, "map") will always be the one of 'from', i.e. "Intensity_M01_Ch01" will be mapped with "Intensity_M04_Ch04" .
 }
 \keyword{internal}

@@ -34,7 +34,10 @@
 #' @param pops a character vector of population names to remove within 'obj'. Note that "All" and "" are not allowed and will be excluded from 'pops' if present.
 #' @param list_only whether to return a list of elements that will be impacted by the removal. Default is TRUE.
 #' If FALSE then modified object will be returned.
-#' @param adjust_graph whether to try to adjust graph when possible. Default is TRUE.
+#' @param adjust_graph whether to try to adjust graph(s) when possible. Default is TRUE.\cr
+#' -TRUE, graph(s) will be kept if possible using only regions, pops it depends that can be found in 'obj',\cr
+#' -FALSE, graph(s) will be kept only if all features, regions, pops it refers to are found in 'obj',\cr
+#' -NA, graph(s) will be removed no matter if features, regions, pops it refers to are found in 'obj'.
 #' @param ... Other arguments to be passed.
 #' @return an `IFC_data` object or a list of elements impacted by removal depending on 'list_only' parameter.
 #' @export
@@ -120,7 +123,6 @@ data_rm_pops <- function(obj, pops, list_only = TRUE, adjust_graph = TRUE, ...) 
   pops_back = obj$pops
   obj$pops = list()
   obj = data_add_pops(obj, pops = pops_back[!(names(pops_back) %in% to_remove_pops)], ...)
-  # remove pops and their dep
-  if(length(to_remove_graphs) != 0) return(adjustGraph(obj = obj, selection = to_remove_graphs, adjust_graph = adjust_graph))
+  obj = data_rm_graphs(obj = obj, graphs = to_remove_graphs, list_only = list_only, adjust_graph = adjust_graph)
   return(obj)
 }

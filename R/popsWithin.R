@@ -54,10 +54,13 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
   display_progress = as.logical(display_progress); assert(display_progress, len = 1, alw = c(TRUE, FALSE))
   assert(title_progress, len = 1, typ = "character")
   
+  # variables used
   K = class(pops)
   L = length(pops)
-
+  alw_fun = sapply(c("&","|","!","("), USE.NAMES = TRUE, simplify = FALSE,
+                   FUN = function(x) getFromNamespace(x, asNamespace("base")))
   obj_number = nrow(features)
+  
   if(display_progress) {
     pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
     on.exit(endPB(pb))
@@ -77,14 +80,17 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
            }, 
            "G" = {
              pop_pos=which(names(regions)==pop$region) # here there should be only one !
+             if(length(pop_pos)!=1) stop(pop$name, ', trying to compute a graphical population with a non-defined region: ["', pop$region, '"]', call. = FALSE)
              fx_pos=which(names(features)==pop$fx)
+             if(length(fx_pos)!=1) stop(pop$name, ', trying to compute a graphical population with an unknown fx ["', pop$fx, '"]', call. = FALSE)
              x=features[,fx_pos]
              xlim=as.numeric(regions[[pop_pos]]$x)
              if(regions[[pop_pos]]$type == "line") {
                xlim=range(xlim)
-               pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & x>=xlim[1] & x<=xlim[2]
+               pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & x>=xlim[1] & x<=xlim[2] & !is.na(x)
              } else {
                fy_pos=which(names(features)==pop$fy)
+               if(length(fy_pos)!=1) stop(pop$name, ', trying to compute a graphical population with an unknown fy ["', pop$fy, '"]', call. = FALSE)
                y=features[,fy_pos]
                ylim=as.numeric(regions[[pop_pos]]$y)
                Xtrans = regions[[pop_pos]]$xtrans; if(length(Xtrans) == 0) Xtrans = regions[[pop_pos]]$xlogrange
@@ -112,28 +118,29 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
              pop_def_tmp[pop_def_tmp=="And"] <- "&"
              pop_def_tmp[pop_def_tmp=="Or"] <- "|"
              pop_def_tmp[pop_def_tmp=="Not"] <- "!"
-             is_ope = pop_def_tmp %in% c("&","|","!",")","(")
-             comb_tmp=do.call(what=cbind, args=lapply(pops[pop$names], FUN=function(i_pop) i_pop$obj))
              replace_with=c()
-             for(i_def in 1:length(pop$names)) replace_with=c(replace_with,random_name(n=10,special=NULL,forbidden=c(replace_with,pop_def_tmp)))
-             for(i_def in 1:length(pop$names)) pop_def_tmp[pop$names[i_def] == pop_def_tmp] <- rep(paste0("`",replace_with[i_def],"`"), sum(pop$names[i_def] == pop_def_tmp))
-             colnames(comb_tmp)=replace_with
-             comb_tmp=eval(expr=parse(text=paste0(pop_def_tmp,collapse=" ")),envir=as.data.frame(comb_tmp,stringsAsFactors=FALSE),enclos=new.env())
-             pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & comb_tmp
+             for(i_def in seq_along(pop$names)) replace_with=c(replace_with,random_name(n=10,special=NULL,forbidden=c(replace_with,pop_def_tmp)))
+             for(i_def in seq_along(pop$names)) pop_def_tmp[pop$names[i_def] == pop_def_tmp] <- rep(paste0("`",replace_with[i_def],"`"), sum(pop$names[i_def] == pop_def_tmp))
+             e = lapply(pops[pop$names], FUN=function(i_pop) i_pop$obj)
+             names(e) = replace_with
+             pops[[i]]$obj=pops[[which(names(pops)==pop$base)]]$obj & eval(expr=parse(text=paste0(pop_def_tmp,collapse="")),envir=c(e, alw_fun),enclos=emptyenv())
            }, 
            "T" = {
              if(length(pop$obj) != obj_number) {
+               if(anyNA(pop$obj)) stop(pop$name, ", trying to compute a tagged population containing NA/NaN")
                Kp = typeof(pop$obj)
                if(Kp%in%c("double","integer")) {
-                 if((obj_number <= max(pop$obj)) | (min(pop$obj) < 0) | any(duplicated(pop$obj))) stop(paste0("trying to compute a tagged population with element(s) outside of objects acquired: ", pop$name))
+                 if((obj_number <= max(pop$obj)) ||
+                    (min(pop$obj) < 0) ||
+                    any(duplicated(pop$obj))) stop(pop$name, ", trying to compute a tagged population with element(s) outside of objects acquired")
                  pops[[i]]$obj=rep(FALSE,obj_number)
                  pops[[i]]$obj[pop$obj+1]=TRUE
                } else {
-                 if(!Kp%in%"logical") stop(paste0("trying to compute a tagged population with element(s) outside of objects acquired: ", pop$name))
+                 if(!Kp%in%"logical") stop(pop$name, ', trying to compute a tagged population of unknown type ["',Kp,'"]')
                }
              }
-             if(sum(pops[[i]]$obj)==0) stop(paste0("trying to compute a tagged population with element(s) outside of objects acquired: ", pop$name))
-             if(obj_number != length(pops[[i]]$obj)) stop(paste0("trying to compute a tagged population with element(s) outside of objects acquired: ", pop$name))
+             if(sum(pops[[i]]$obj)==0) stop(pop$name, ", trying to compute a tagged population of length = 0")
+             if(obj_number != length(pops[[i]]$obj)) stop(pop$name, ", trying to compute a tagged population with more element(s) than total number of objects acquired")
            })
     if(display_progress) {
       setPB(pb, value = i, title = title_progress, label = "extacting populations")

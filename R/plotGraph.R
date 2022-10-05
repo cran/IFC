@@ -128,7 +128,9 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
   graph_n = unlist(lapply(g$GraphRegion, FUN=function(x) x$def))
   
   operators = c("And","Or","Not","(",")")
-  displayed_n = unique(splitn(definition = g$order, all_names = c(base_n, graph_n, shown_n, "Selected Bin"), operators = operators))
+  all_names = c(base_n, graph_n, shown_n, "Selected Bin")
+  alt_names = gen_altnames(all_names)
+  displayed_n = unique(splitn(definition = g$order, all_names = all_names, alt_names = alt_names, operators = operators))
   displayed_n = setdiff(displayed_n, "Selected Bin")
   displayed_r = rev(displayed_n)
   tmp = displayed_n %in% names(P)
@@ -179,8 +181,9 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
     }
     if(viewport == "ideas") {
       if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
-      D[D[,"x2"] < Xlim[1], "x2"] <- Xlim[1] # D = D[(D[,"x2"] >= Xlim[1]) & (D[,"x2"] <= Xlim[2]), ]
-      D[D[,"x2"] > Xlim[2], "x2"] <- Xlim[2] #
+      no_nas = !is.na(D[,"x2"])
+      D[no_nas & (D[,"x2"] < Xlim[1]), "x2"] <- Xlim[1] # D = D[(D[,"x2"] >= Xlim[1]) & (D[,"x2"] <= Xlim[2]), ]
+      D[no_nas & (D[,"x2"] > Xlim[2]), "x2"] <- Xlim[2] #
     }
     if(!all(is.finite(Xlim))) {
       Xlim = c(g$xmin, g$xmax)
@@ -188,8 +191,9 @@ plotGraph = function(obj, graph, draw = FALSE, stats_print = draw,
       Xlim = Xlim + c(-0.07,0.07)*diff(Xlim)
       if(!all(is.finite(Xlim))) Xlim = c(-1, 1)
       if(Xlim[1] == Xlim[2]) Xlim = Xlim[1] + c(-0.07,0.07)
-      D[D[,"x2"] < Xlim[1], "x2"] <- Xlim[1]
-      D[D[,"x2"] > Xlim[2], "x2"] <- Xlim[2]
+      no_nas = !is.na(D[,"x2"])
+      D[no_nas & (D[,"x2"] < Xlim[1]), "x2"] <- Xlim[1]
+      D[no_nas & (D[,"x2"] > Xlim[2]), "x2"] <- Xlim[2]
     }
     smooth = (g$histogramsmoothingfactor != 0)
     br = do.breaks(Xlim, nbin)

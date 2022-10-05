@@ -138,7 +138,11 @@ val_constr=function(x, h, type) {
 pan_smooth=function(x, type, br, normalize, fill, lwd, lty, col, alpha, ylim, bin, border, include.lowest=TRUE, right=TRUE, factor=0) {
   h=hist_constr(x, br, include.lowest=include.lowest, right=right, plot = FALSE)
   xx=val_constr(x, h, "mids")
-  yy=density(x, n=bin, na.rm=TRUE, from=min(br), to=max(br))$y
+  yy=try(density(x, n=bin, na.rm=TRUE, from=min(br), to=max(br))$y, silent = TRUE)
+  if(inherits(yy, "try-error")) {
+    warning(attr(yy, "condition")$message)
+    yy = 0
+  }
   yy[xx<min(x, na.rm=TRUE)]=0
   yy[xx>max(x, na.rm=TRUE)]=0
   # if(normalize) {yy=yy/max(yy)*max(ylim)} else {yy=yy/max(yy)*max(val_constr(x, h, type))}
@@ -363,7 +367,11 @@ base_hist_constr=function(x, type, br, normalize, fill, smooth, lwd, lty, col, a
   b["alpha",] <- alpha * b["alpha",]
   if(smooth) {
     xx=val_constr(x, h, "mids")
-    yy=density(x, n=length(br)-1, na.rm=TRUE, from=min(br), to=max(br))$y
+    yy=try(density(x, n=length(br)-1, na.rm=TRUE, from=min(br), to=max(br))$y, silent = TRUE)
+    if(inherits(yy, "try-error")) {
+      warning(attr(yy, "condition")$message)
+      yy = 0
+    }
     yy[xx<min(x, na.rm=TRUE)]=0
     yy[xx>max(x, na.rm=TRUE)]=0
     if(normalize) {yy=yy/max(yy)} else {yy=yy/max(yy)*max(val_constr(x, h, type))}
@@ -677,13 +685,22 @@ plot_base=function(obj) {
   if(any(obj$input$add_key %in% c("panel","global","both"))) {
     args_key = list(x="topleft",inset=0.025,
                     col=sapply(displayed, FUN=function(p) p[c("color","lightModeColor")][[obj$input$mode]]),
-                    legend=disp_n,cex=obj$plot$par.settings$add.text$cex * 0.5,bg="#ADADAD99",pt.cex=1,bty="o",box.lty=0)
-    if(obj$input$add_key %in% c("panel","both")) do.call(args=c(list(pch=sapply(displayed, FUN=function(p) p$style)), args_key), what=legend)
+                    cex=obj$plot$par.settings$add.text$cex * 0.5,bg="#ADADAD99",pt.cex=1,bty="o",box.lty=0)
+    if(obj$input$type %in% c("percent", "count")) {
+      args_key=c(args_key, list(lty = c(1,2,3,4,6)[match(basepop[[obj$input$order[disp]]]$linestyle,c("Solid","Dash","Dot","DashDot","DashDotDot"))]))
+    } else {
+      args_key=c(args_key, list(pch=sapply(displayed, FUN=function(p) p$style)))
+    }
+    args_key$legend=disp_n
+    if(obj$input$add_key %in% c("panel","both")) {
+      do.call(args= args_key, what=legend) 
+    }
     if(obj$input$add_key %in% c("global","both")) {
       args_key$x = "top"
       args_key$inset = -graphics::grconvertY(1+ length(displayed), "chars", "nfc")
       args_key$xpd = TRUE
-      do.call(args=c(list(pch=sapply(displayed, FUN=function(p) p$style)), args_key), what=legend)
+      # TODO add something better for title positioning
+      do.call(args= args_key, what=legend)
       mtext(side = 3, line = 2 + length(displayed) * obj$plot$par.settings$add.text$cex * 0.5, adj = 0.5, args_plot$main, font = 2)
       args_sub$line = 1.1 + length(displayed) * obj$plot$par.settings$par.main.text$cex * 0.8
     } 
@@ -890,10 +907,10 @@ plot_lattice=function(obj) {
   if(ylab == "") ylab = " "
   if(type %in% c("percent", "count")) {
     # define legend
-    KEY = list("text"=list(displayed_n),
-               "cex"=lt$add.text$cex * 0.5,
+    KEY = list("cex"=lt$add.text$cex * 0.5,
                "lines"=list(col = sapply(displayed_n, FUN=function(p) P[[p]][c("color","lightModeColor")][[color_mode]]),
-                            lty = sapply(displayed_n, FUN=function(r) c(1,2,3,4,6)[match(basepop[[displayed_o[r]]]$linestyle,c("Solid","Dash","Dot","DashDot","DashDotDot"))])))
+                            lty = sapply(displayed_n, FUN=function(r) c(1,2,3,4,6)[match(basepop[[displayed_o[r]]]$linestyle,c("Solid","Dash","Dot","DashDot","DashDotDot"))])),
+               "text"=list(displayed_n))
     # make histogram
     if(nrow(D) > 0) {
       br = do.breaks(Xlim, nbin)
@@ -960,10 +977,10 @@ plot_lattice=function(obj) {
     }
   } else {
     # define legend
-    KEY = list("text"=list(rev(displayed_n)),
-               "cex"=lt$add.text$cex * 0.5,
+    KEY = list("cex"=lt$add.text$cex * 0.5,
                "points"=list(col = sapply(P[rev(displayed_n)], FUN=function(p) p[c("color","lightModeColor")][[color_mode]]),
-                             pch = sapply(P[rev(displayed_n)], FUN=function(p) p$style)))
+                             pch = sapply(P[rev(displayed_n)], FUN=function(p) p$style)),
+               "text"=list(displayed_n))
     # identify groups
     groups = NULL
     if(nrow(D) > 0) if(type == "scatter") if(precision=="light") {
@@ -1102,23 +1119,30 @@ plot_stats=function(obj) {
   base_n = base_n[order(base_o)]
   graph_n = obj$input$graphical
   shown_n = setdiff(rev(displayed_n), c(base_n, graph_n))
+  if("y2" %in% colnames(D)) {
+    no_nas = !(is.na(D[,"x2"]) | is.na(D[,"y2"]))
+  } else {
+    no_nas = !is.na(D[,"x2"])
+  }
   
   stats = NULL
   if(type %in% c("count","percent")) {
     coln_stats = c("count","perc","Min.","1st Qu.","Median","Mean","3rd Qu.","Max.")
     stats = structure(matrix(numeric(), ncol = length(coln_stats), nrow = 0), dimnames = list(character(), coln_stats))
     base_s = lapply(base_n, FUN=function(d) {
-      np = sum(D[,d])
+      v = no_nas & D[,d]
+      np = sum(v)
       if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-      p = c("count"=np, "perc"=100, summary(na.omit(D[D[,d],"x1"])))
+      p = c("count"=np, "perc"=100, summary(D[v,"x1"]))
     })
     kids_s = lapply(shown_n, FUN=function(s) {
       do.call(what = rbind, args = lapply(base_n, FUN=function(d) {
-        np = sum(D[,d])
+        v = no_nas & D[,d]
+        np = sum(v)
         if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-        isin = D[,d] & D[,s]
+        isin = v & D[,s]
         n = sum(isin)
-        c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])))
+        c("count"=n, "perc"=n/np*100, summary(D[isin,"x1"]))
       }))
     })
     kids_r = lapply(reg_n, FUN=function(r) {
@@ -1127,34 +1151,37 @@ plot_stats=function(obj) {
         reg = R[[r]]
         coords = reg["x"]
         coords$x = applyTrans(coords$x, trans_x)
-        np = sum(D[,d])
+        v = no_nas & D[,d]
+        np = sum(v)
         if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-        isin = D[D[,d],"x2"]
+        isin = D[v,"x2"]
         isin = (isin >= min(coords$x)) & (isin <= max(coords$x))
         n = sum(isin)
-        c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])))
+        c("count"=n, "perc"=n/np*100, summary(D[v,"x1"][isin]))
       }))
     })
     stats = do.call(what=rbind, args=c(base_s, kids_s, kids_r))
     rnames = base_n
-    if(length(reg_n) > 0) rnames = c(rnames, unlist(t(sapply(base_n, FUN = function(b) {if(b == "All") {graph_n} else {paste(reg_n, b, sep = " & ") }}))))
+    if(length(reg_n) > 0) rnames = unique(c(rnames, unlist(t(sapply(base_n, FUN = function(b) {if(b == "All") {graph_n} else {paste(reg_n, b, sep = " & ") }})))))
     rownames(stats) = rnames
     colnames(stats) = c(coln_stats[1:2], paste0("x-",coln_stats[3:8]))
   } else {
     coln_stats = c("count","perc","Min.","1st Qu.","Median","Mean","3rd Qu.","Max.","Min.","1st Qu.","Median","Mean","3rd Qu.","Max.")
     stats = structure(matrix(numeric(), ncol = length(coln_stats), nrow = 0), dimnames = list(character(), coln_stats))
     base_s = lapply(base_n, FUN=function(d) {
-      np = sum(D[,d])
+      v = no_nas & D[,d]
+      np = sum(v)
       if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-      p = c("count"=np, "perc"=100, summary(na.omit(D[D[,d],"x1"])), summary(na.omit(D[D[,d],"y1"])))
+      p = c("count"=np, "perc"=100, summary(D[v,"x1"]), summary(D[v,"y1"]))
     })
     kids_s = lapply(shown_n, FUN=function(s) {
       do.call(what = rbind, args = lapply(base_n, FUN=function(d) {
-        np = sum(D[,d])
+        v = no_nas & D[,d]
+        np = sum(v)
         if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-        isin = D[,d] & D[,s]
+        isin = v & D[,s]
         n = sum(isin)
-        c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])), summary(na.omit(D[isin,"y1"])))
+        c("count"=n, "perc"=n/np*100, summary(D[isin,"x1"]), summary(D[isin,"y1"]))
       }))
     })
     kids_r = lapply(reg_n, FUN=function(r) {
@@ -1166,11 +1193,12 @@ plot_stats=function(obj) {
       if(reg$type=="oval") alg = 3
       if(reg$type=="rect") alg = 2
       do.call(what = rbind, args = lapply(base_n, FUN=function(d) {
-        np = sum(D[,d])
+        v = no_nas & D[,d]
+        np = sum(v)
         if(np == 0) return(structure(rep(NA, length(coln_stats)), names = coln_stats))
-        isin = cpp_pnt_in_gate(pnts = cbind(D[D[,d],"x2"],D[D[,d],"y2"]), gate = cbind(coords$x,coords$y), algorithm = alg)
+        isin = cpp_pnt_in_gate(pnts = cbind(D[v,"x2"],D[v,"y2"]), gate = cbind(coords$x,coords$y), algorithm = alg)
         n = sum(isin)
-        c("count"=n, "perc"=n/np*100, summary(na.omit(D[isin,"x1"])), summary(na.omit(D[isin,"y1"])))
+        c("count"=n, "perc"=n/np*100, summary(D[v,"x1"][isin]), summary(D[v,"y1"][isin]))
       }))
     })
     stats = do.call(what=rbind, args=c(base_s, kids_r, kids_s))
@@ -1187,63 +1215,57 @@ plot_stats=function(obj) {
 #' @name adjustGraph
 #' @description Helper to readjust `IFC_data` graphs in case of missing feature, region, population.
 #' @param obj an object of class `IFC_data` extracted by ExtractFromDAF(extract_features = TRUE) or ExtractFromXIF(extract_features = TRUE).
-#' @param selection when provided, indices of desired graphs.\cr
-#' Note that indices are read from left to right, from top to bottom. 
-#' @param adjust_graph whether to try to adjust graph when possible. Default is TRUE.
+#' @param graph a graph from 'obj' or a list that can be coerced by \code{\link{buildGraph}}.
+#' @param adjust_graph whether to try to adjust graph(s) when possible. Default is TRUE.\cr
+#' -TRUE, graph(s) will be kept if possible using only regions, pops it depends that can be found in 'obj',\cr
+#' -FALSE, graph(s) will be kept only if all features, regions, pops it refers to are found in 'obj',\cr
+#' -NA, graph(s) will be removed no matter if features, regions, pops it refers to are found in 'obj'.
 #' @param ... other arguments to be passed.
 #' @keywords internal
-adjustGraph=function(obj, selection, adjust_graph = TRUE, ...) {
+adjustGraph=function(obj, graph, adjust_graph=TRUE, ...) {
   dots = list(...)
   assert(obj, cla = "IFC_data")
-  G = obj$graphs
-  N = names(G)
-  if(length(G) > 0) {
-    if(missing(selection)) {
-      selection = 1:length(G)
-    } else {
-      if(!all(na.omit(selection)%in%(1:length(G)))) stop("'selection' refers to graph absent from 'obj'")
-    }
-    foo = lapply(1:length(G), FUN = function(i_graph) {
-      g = G[[i_graph]]
-      if(i_graph %in% selection) {
-        # check if x axis is present in obj
-        if(!(g$f1 %in% names(obj$features))) return(NULL)
-        # check if y axis is present in obj
-        if(g$type != "histogram") if(!(g$f2 %in% names(obj$features))) return(NULL)
-        # check that at least one base pop will be plot
-        tmp = sapply(g$BasePop, FUN = function(p) p$name %in% names(obj$pops))
-        if(!adjust_graph) if(!all(tmp)) return(NULL)
-        if(!any(tmp)) return(NULL)
-        # remove BasePop not present in obj
-        g$BasePop = g$BasePop[tmp]
-        # remove GraphRegion not found in obj
-        if(length(g$GraphRegion) !=0 && length(g$GraphRegion[[1]]) != 0) {
-          tmp = sapply(g$GraphRegion, FUN = function(r) r$name %in% names(obj$regions))
-          if(!adjust_graph) if(!all(tmp)) return(NULL)
-          g$GraphRegion = g$GraphRegion[tmp]
-        }
-        # remove ShownPop not found in obj
-        if(length(g$ShownPop) != 0 && length(g$ShownPop[[1]]) != 0) {
-          tmp = sapply(g$ShownPop, FUN = function(p) p$name %in% names(obj$pops))
-          if(!adjust_graph) if(!all(tmp)) return(NULL)
-          g$ShownPop = g$ShownPop[sapply(g$ShownPop, FUN = function(p) p$name %in% names(obj$pops))]
-        }
-        # rebuild Graph, mainly to recompute order
-        g = do.call(what = buildGraph, args = g[!grepl("order", names(g))])
-        if(inherits(x = g, what = "try-error")) return(NULL)
-        # try to draw the graph
-        drawable = plotGraph(obj = obj, graph = g, draw = FALSE, stats_print = FALSE)
-        if(inherits(x = drawable, what = "try-error")) return(NULL)
-      }
-      return(g)
-    })
-    names(foo) = N
-    bar = foo[sapply(foo, FUN = function(x) length(x) > 0)]
-    class(bar) = class(obj$graphs)
-    obj$graphs = bar
-    return(obj)
-  } else {
-    if(!missing(selection) && (length(na.omit(selection)) != 0)) stop("'selection' refers to graph absent from 'obj'")
-    return(obj)
+  adjust_graph = as.logical(adjust_graph);
+  assert(adjust_graph, len = 1, alw = c(as.logical(NA),TRUE,FALSE))
+  f_name = names(obj$features)
+  r_name = names(obj$regions)
+  p_name = names(obj$pops)
+  g = graph
+  if(is.na(adjust_graph)) return(list())
+  # check if x axis is present in obj
+  if(!(g$f1 %in% f_name)) return(list())
+  # check if y axis is present in obj
+  if(g$type != "histogram") if(!(g$f2 %in% f_name)) return(list())
+  # check that at least one base pop will be plot
+  tmp = sapply(g$BasePop, FUN = function(p) p$name %in% p_name)
+  if(!adjust_graph) if(!all(tmp)) return(list())
+  if(!any(tmp)) return(list())
+  # remove BasePop not present in obj
+  g$BasePop = g$BasePop[tmp]
+  # remove GraphRegion not found in obj
+  if(length(g$GraphRegion) !=0 && length(g$GraphRegion[[1]]) != 0) {
+    # remove region not found
+    tmp = sapply(g$GraphRegion, FUN = function(r) r$name %in% r_name)
+    if(!adjust_graph) if(!all(tmp)) return(list())
+    g$GraphRegion = g$GraphRegion[tmp]
+    # remove region if pop graphically defined by region is not found
+    tmp = lapply(sapply(seq_along(g$GraphRegion), FUN = function(i_r) g$GraphRegion[[i_r]]$name),
+                 FUN = function(n) p_name[sapply(obj$pops, FUN = function(p) p$region) %in% n])
+    tmp = sapply(seq_along(tmp), FUN = function(i) any(tmp[[i]] %in% p_name))
+    if (!adjust_graph) if (!all(tmp)) return(list())
+    g$GraphRegion = g$GraphRegion[tmp]
   }
+  # remove ShownPop not found in obj
+  if(length(g$ShownPop) != 0 && length(g$ShownPop[[1]]) != 0) {
+    tmp = sapply(g$ShownPop, FUN = function(p) p$name %in% p_name)
+    if(!adjust_graph) if(!all(tmp)) return(list())
+    g$ShownPop = g$ShownPop[tmp]
+  }
+  # rebuild Graph, mainly to recompute order
+  g = try(do.call(what = buildGraph, args = g[!grepl("order", names(g))]), silent = TRUE)
+  if(inherits(x = g, what = "try-error")) return(list())
+  # try to draw the graph
+  drawable = try(plot_lattice(plotGraph(obj = obj, graph = g, draw = FALSE, stats_print = FALSE)), silent = TRUE)
+  if(inherits(x = drawable, what = "try-error")) return(list())
+  return(g)
 }

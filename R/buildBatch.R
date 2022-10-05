@@ -147,7 +147,7 @@ buildBatch <- function(files, compensation, analysis, default_batch_dir, config_
   }
   if(length(batch_dir) == 0) batch_dir = tempdir(check = TRUE)
   attr(x = batch_dir, which = "tempdir") <- is_tmp_dir
-
+  
   # checks analysis
   if(!missing(analysis)) {
     if(!file.exists(analysis)) stop(paste0("can't find analysis file:\n",analysis))
@@ -171,8 +171,8 @@ buildBatch <- function(files, compensation, analysis, default_batch_dir, config_
   }
   if(length(files) == 0) stop("no file to batch using 'files' argument")
   info = lapply(files, getInfo, from = "acquisition")
+  num_channels = unique(sapply(info, FUN=function(x) nrow(x$Images)))
   if(!allow_channels_dissimilarity) {
-    num_channels = unique(sapply(info, FUN=function(x) nrow(x$Images)))
     if(length(num_channels) !=1 ) stop("'files' have been acquired on different amount of channels")
     ids_channels = sapply(info, FUN=function(x) c(sum(x$in_use), x$Images$physicalChannel[x$in_use])) # maybe to remove to allow
     if(typeof(ids_channels) == "list") stop("'files' have been acquired on different physical channels") # maybe to remove
@@ -208,6 +208,7 @@ buildBatch <- function(files, compensation, analysis, default_batch_dir, config_
     if(c_Ext == "cif") fileName_comp = compensation
   }
   if(fileName_comp=="") {
+    num_channels = 12L
     coeff = paste0(as.numeric(sapply(1:num_channels, FUN=function(x) 1:num_channels==x)), collapse="|")
   } else {
     IFD = getIFD(fileName = fileName_comp, offsets = "first", trunc_bytes = 8, force_trunc = FALSE, bypass = FALSE)
@@ -270,24 +271,31 @@ buildBatch <- function(files, compensation, analysis, default_batch_dir, config_
                                  xml_new_node(name=N, attrs = A)
                                }))
     } else {
-      StatisticsReports = list(name="StatisticsReports", text = "")
+      StatisticsReports = list(name="StatisticsReports",
+                               .children = xml_new_node(name = "StatisticsReport",
+                                                        attrs = list(filename="",
+                                                                    count="0",
+                                                                    title="",
+                                                                    classifier="",
+                                                                    display_stats="true")))
+      statoutputfile = list(name="statoutputfile", attrs = list(name = ""))
     }
     nodes = c(nodes, list(statoutputfile), list(StatisticsReports))
   } else {
-    statoutputfile = list(name="statoutputfile", attrs = "")
+    statoutputfile = list(name="statoutputfile", attrs = list(name = ""))
     nodes = c(nodes, list(statoutputfile))
   }
   xml = do.call(what = xml_new_node, args = list(name="batch",
-                                            attrs=list(folder=name,
-                                                       align=opt[["Spatial alignment"]],
-                                                       dc=opt[["Camera background"]],
-                                                       spectral=opt[["Brightfield compensation"]],
-                                                       edf=opt[["EDF deconvolution"]],
-                                                       output="current",
-                                                       overwrite=ifelse(overwrite,"Y","N"),
-                                                       suffix=suffix,
-                                                       overridesuffix="",
-                                                       alldone="Y"),
-                                            .children=lapply(nodes, do.call, what=xml_new_node)))
+                                                 attrs=list(folder=name,
+                                                            align=opt[["Spatial alignment"]],
+                                                            dc=opt[["Camera background"]],
+                                                            spectral=opt[["Brightfield compensation"]],
+                                                            edf=opt[["EDF deconvolution"]],
+                                                            output="current",
+                                                            overwrite=ifelse(overwrite,"Y","N"),
+                                                            suffix=suffix,
+                                                            overridesuffix="",
+                                                            alldone="Y"),
+                                                 .children=lapply(nodes, do.call, what=xml_new_node)))
   return(list(xml=xml, batch_dir=batch_dir))
 }
