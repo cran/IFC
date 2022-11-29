@@ -47,7 +47,7 @@ using namespace Rcpp;
 //' @param lin_comp double, value that is used to smooth transition between Lin/Log.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector hpp_smoothLinLog (const Rcpp::NumericVector x,
                                       const double hyper = 1000.0,
                                       const double base = 10.0,
@@ -83,7 +83,7 @@ Rcpp::NumericVector hpp_smoothLinLog (const Rcpp::NumericVector x,
 //' @param lin_comp double, value that is used to smooth transition between Lin/Log.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector hpp_inv_smoothLinLog (const Rcpp::NumericVector x,
                                           const double hyper = 1000.0, 
                                           const double base = 10.0, 
@@ -114,7 +114,7 @@ Rcpp::NumericVector hpp_inv_smoothLinLog (const Rcpp::NumericVector x,
 //' @param x uint32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::RawVector hpp_uint32_to_raw(const uint32_t x) {
   Rcpp::RawVector out(4);
   out[3] = (x >> 24) & 0xff;
@@ -131,7 +131,7 @@ Rcpp::RawVector hpp_uint32_to_raw(const uint32_t x) {
 //' @param x int32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 uint32_t hpp_int32_to_uint32 (const int32_t x) {
   uint32_t out = x;
   return out;
@@ -144,10 +144,61 @@ uint32_t hpp_int32_to_uint32 (const int32_t x) {
 //' @param x uint32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 int32_t hpp_uint32_to_int32 (const uint32_t x) {
   int32_t out = x;
   return out;
+}
+
+//' @title Offset to Raw Conversion
+//' @name cpp_offset_to_raw
+//' @description
+//' Converts offset to raw
+//' @param x double.
+//' @param swap bool, whether to swap or not.
+//' @keywords internal
+////' @export
+// [[Rcpp::export(rng = false)]]
+Rcpp::RawVector hpp_offset_to_raw (const double x, const bool swap = false) {
+  uint32_t a = x / 4294967296;
+  uint32_t b = x - (a * 4294967296);
+  if(swap) {
+    Rcpp::RawVector aa = rev(hpp_uint32_to_raw(a));
+    Rcpp::RawVector bb = rev(hpp_uint32_to_raw(b));
+    return c_vector(bb, aa);
+  }
+  return c_vector(hpp_uint32_to_raw(b), hpp_uint32_to_raw(a));
+}
+
+//' @title Offset to Raw Conversion
+//' @name cpp_raw_to_offset
+//' @description
+//' Converts raw to offset
+//' @param x RawVector.
+//' @param swap bool, whether to swap or not.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+double hpp_raw_to_offset (const Rcpp::RawVector x, const bool swap = false) {
+  if(x.size() != 8) Rcpp::stop("cpp_raw_to_offset: 'x' should be a raw vector of length 8");
+  if(swap) {
+    return hpp_int32_to_uint32((x[3] & 0xff) + 
+                               ((x[2] & 0xff) <<  8) +
+                               ((x[1] & 0xff) << 16) +
+                               ((x[0] & 0xff) << 24)) +
+    4294967296 * hpp_int32_to_uint32((x[7] & 0xff) + 
+                               ((x[6] & 0xff) <<  8) +
+                               ((x[5] & 0xff) << 16) +
+                               ((x[4] & 0xff) << 24));
+  }
+  return hpp_int32_to_uint32((x[0] & 0xff) + 
+                             ((x[1] & 0xff) <<  8) +
+                             ((x[2] & 0xff) << 16) +
+                             ((x[3] & 0xff) << 24)) +
+  4294967296 * hpp_int32_to_uint32((x[4] & 0xff) + 
+                             ((x[5] & 0xff) <<  8) +
+                             ((x[6] & 0xff) << 16) +
+                             ((x[7] & 0xff) << 24));
 }
 
 //' @title Int64 to Uint64 64bits Conversion
@@ -157,7 +208,7 @@ int32_t hpp_uint32_to_int32 (const uint32_t x) {
 //' @param x int64_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 uint64_t hpp_int64_to_uint64 (const int64_t x) {
   uint64_t out = x;
   return out;
@@ -170,7 +221,7 @@ uint64_t hpp_int64_to_uint64 (const int64_t x) {
 //' @param x uint64_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 int64_t hpp_uint64_to_int64 (const uint64_t x) {
   int64_t out = x;
   return out;
@@ -183,7 +234,7 @@ int64_t hpp_uint64_to_int64 (const uint64_t x) {
 //' @param V a NumericVector
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::NumericVector> hpp_v_int32_to_uint32 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
   if(nNotisNULL(V)) {
     Rcpp::NumericVector out(V.get());
@@ -200,7 +251,7 @@ Rcpp::Nullable<Rcpp::NumericVector> hpp_v_int32_to_uint32 (Rcpp::Nullable<Rcpp::
 //' @param V a NumericVector
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::NumericVector> hpp_v_int64_to_uint64 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
   if(nNotisNULL(V)) {
     Rcpp::NumericVector out(V.get());

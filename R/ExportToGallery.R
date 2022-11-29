@@ -263,7 +263,13 @@ ExportToGallery <- function(...,
     }
   }
   extract_max = as.integer(min(extract_max, length(objects)))
-  if(sampling) {objects=sample(objects,extract_max)} else {objects=objects[1:extract_max]}
+  if(sampling) {
+    SEED = param$random_seed
+    if(!is.list(SEED)) SEED = do.call(fetch_seed, list(seed = SEED))
+    with_seed({objects=sample(objects,extract_max)}, SEED$seed, SEED$kind, SEED$normal.kind, SEED$sample.kind)
+  } else {
+    objects=objects[1:extract_max]
+  }
   if(length(objects)!=1) if(param$size[2] == 0) stop("'size' width should be provided when 'object' length not equal to one")
   
   # check export/write_to
@@ -326,7 +332,7 @@ ExportToGallery <- function(...,
   tryCatch({
     tryCatch({
       if(display_progress) {
-        pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+        pb = newPB(min = 0, max = L, initial = 0, style = 3)
         ans = lapply(1:L, FUN = function(i) {
           setPB(pb, value = i, title = title_progress, label = "exporting objects")
           do.call(what = "objectExtract", args = c(list(ifd = lapply(sel[[i]],
@@ -387,7 +393,7 @@ ExportToGallery <- function(...,
       if(add_ids > 0) if(any(param$brightfield$channel)) if(channel_id[layout[add_ids]] %in% as.character(which(param$brightfield$channel))) col = "black"
       ids = sapply(ans, attr, which = "object_id")
     } else {
-      ids = as.integer(gsub("^.*_(.*)$", "\\1", sapply(ans, attr, which = "offset_id")))
+      ids = as.integer(gsub("msk_", "", gsub("img_", "", sapply(ans, attr, which = "offset_id"), fixed = TRUE), fixed = TRUE))
     }
     ans = lapply(1:length(objects), FUN = function(i) {
       img = ans[[i]][layout]

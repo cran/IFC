@@ -43,8 +43,21 @@
 #include "../inst/include/resize.hpp"
 #include "../inst/include/group.hpp"
 #include "../inst/include/plot.hpp"
-#include "../inst/include/cbind.hpp"
 using namespace Rcpp;
+
+//' @title Get Current Compilation Bits Depth
+//' @name cpp_getBits
+//' @description
+//' Retrieve size of std::size_t.
+//' @return an unsigned integer
+//' @keywords internal
+////' @export
+// [[Rcpp::export(rng = false)]]
+unsigned int cpp_getBits () {
+  std::size_t foo = 0;
+  return sizeof(foo);
+}
+
 
 // FROM align
 //' @title Spatial Offsets Image Correction
@@ -60,7 +73,7 @@ using namespace Rcpp;
 //' @return a NumericMatrix.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix cpp_align(const Rcpp::NumericMatrix mat,
                               const double dx = NA_REAL,
                               const double dy = NA_REAL) {
@@ -81,7 +94,7 @@ Rcpp::NumericMatrix cpp_align(const Rcpp::NumericMatrix mat,
 //' fun is placed in cpp_assert() in order to check it is correct before being used in assert() function.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::LogicalVector cpp_assert(const RObject x,
                                const Rcpp::Nullable<Rcpp::IntegerVector> len = R_NilValue,
                                const Rcpp::Nullable<Rcpp::CharacterVector> cla = R_NilValue,
@@ -101,7 +114,7 @@ Rcpp::LogicalVector cpp_assert(const RObject x,
 //' @param bound_y NumericVector, y-boundaries of the ellipse.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector cpp_ell_coord (const Rcpp::NumericVector bound_x,
                                    const Rcpp::NumericVector bound_y) {
   return hpp_ell_coord (bound_x, bound_y);
@@ -120,7 +133,7 @@ Rcpp::NumericVector cpp_ell_coord (const Rcpp::NumericVector bound_x,
 //' @param epsilon double, epsilon threshold value. Default is 0.000000000001
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::LogicalVector cpp_pnt_in_gate (const Rcpp::NumericMatrix pnts,
                                      const Rcpp::NumericMatrix gate,
                                      const int algorithm = 1,
@@ -128,7 +141,23 @@ Rcpp::LogicalVector cpp_pnt_in_gate (const Rcpp::NumericMatrix pnts,
   return hpp_pnt_in_gate (pnts, gate, algorithm, epsilon);
 }
 // END gate
+
 // FROM utils
+//' @title Multiple Pattern Fixed Matching
+//' @name cpp_mpfmatch
+//' @description
+//' String matching with multiple pattern.
+//' @param x,pattern Nullable Rcpp CharacterVector.
+//' @details equivalent of as.logical(sum(unlist(lapply(pattern, grepl, x = x, fixed = TRUE)))).
+//' @return a bool
+//' @keywords internal
+////' @export
+// [[Rcpp::export(rng = false)]]
+bool cpp_mpfmatch(const Rcpp::Nullable<Rcpp::CharacterVector> x = R_NilValue,
+                  const Rcpp::Nullable<Rcpp::CharacterVector> pattern = R_NilValue) {
+  return hpp_mpfmatch(x, pattern);
+}
+
 //' @title Sequence of Strings Matching
 //' @name cpp_seqmatch
 //' @description
@@ -138,7 +167,7 @@ Rcpp::LogicalVector cpp_pnt_in_gate (const Rcpp::NumericMatrix pnts,
 //' @return the index (starting at 1) when a match has been found. Otherwise 0.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 R_len_t cpp_seqmatch(const Rcpp::StringVector x,
                      const Rcpp::StringVector y) {
   return hpp_seqmatch(x,y);
@@ -151,7 +180,7 @@ R_len_t cpp_seqmatch(const Rcpp::StringVector x,
 //' @return a LogicalVector.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_rowAny(const Rcpp::Nullable<Rcpp::LogicalVector> M_ = R_NilValue) {
   return hpp_fast_rowAny(M_);
 }
@@ -164,7 +193,7 @@ Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_rowAny(const Rcpp::Nullable<Rcpp::L
 //' @return a LogicalVector.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_listAny(const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue) {
   return hpp_fast_listAny(L_);
 }
@@ -178,7 +207,7 @@ Rcpp::Nullable<Rcpp::LogicalVector> cpp_fast_listAny(const Rcpp::Nullable<Rcpp::
 //' @return a NumericVector.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector cpp_fast_range(const Rcpp::Nullable<Rcpp::NumericVector> x_ = R_NilValue) {
   return hpp_fast_range(x_);
 }
@@ -209,7 +238,7 @@ Rcpp::IntegerVector cpp_fast_sample(const R_len_t n = 0,
 //' @param rev bool whether to reverse order or not. Default is false.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order (const R_len_t obj = 0,
                                                          const Rcpp::Nullable<Rcpp::IntegerVector> byt_ = R_NilValue,
                                                          const Rcpp::Nullable<Rcpp::IntegerVector> ord_ = R_NilValue,
@@ -225,7 +254,7 @@ Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order (const R_len_t obj = 0,
 //' @param by a double used as replcaement value. Default is 0.0
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::NumericVector> cpp_replace_non_finite(const Rcpp::Nullable<Rcpp::NumericVector> V_ = R_NilValue,
                                                            const double by = 0.0) {
   return hpp_replace_non_finite (V_, by);
@@ -238,7 +267,7 @@ Rcpp::Nullable<Rcpp::NumericVector> cpp_replace_non_finite(const Rcpp::Nullable<
 //' @param V named NumericVector of channel display properties containing 'xmin', 'xmax', 'xmid' and 'ymid'.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double cpp_computeGamma (const Rcpp::NumericVector V) {
   return hpp_computeGamma (V);
 }
@@ -251,7 +280,7 @@ double cpp_computeGamma (const Rcpp::NumericVector V) {
 //' @return a string, representing the base64 encoding of x.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 std::string cpp_base64_encode (const Rcpp::RawVector x) {
   return hpp_base64_encode (x);
 }
@@ -263,7 +292,7 @@ std::string cpp_base64_encode (const Rcpp::RawVector x) {
 //' @param image, a [0,1] normalized image matrix or 3D array. If 3D array, 3rd dimension should be of length 1 or 3.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::RawVector cpp_writeBMP (const Rcpp::NumericVector image) {
  return hpp_writeBMP (image); 
 }
@@ -281,7 +310,7 @@ Rcpp::RawVector cpp_writeBMP (const Rcpp::NumericVector image) {
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 std::string cpp_checkTIFF (const std::string fname) {
   return hpp_checkTIFF(fname);
 }
@@ -294,17 +323,19 @@ std::string cpp_checkTIFF (const std::string fname) {
 //' @param obj_count R_len_t, numbers of objects present in the file. Default is 0.
 //' If obj_count <= 0 then progress_bar is forced to false.
 //' @param display_progress bool, whether to display a progress bar. Default is false.
+//' @param pb a List of class `IFC_progress` containing a progress bar of class `txtProgressBar`, `winProgressBar` or `Progress`. Default is R_Nilvalue.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is false.
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
-//' @return an integer vector with offsets of IFDs found.
+//' @return an numeric vector with offsets of IFDs found.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
-Rcpp::IntegerVector cpp_getoffsets_noid(const std::string fname, 
-                                        const R_len_t obj_count = 0, 
+// [[Rcpp::export(rng = false)]]
+Rcpp::NumericVector cpp_getoffsets_noid(const std::string fname,
+                                        const R_len_t obj_count = 0,
                                         const bool display_progress = false,
+                                        const Rcpp::Nullable<Rcpp::List> pb = R_NilValue,
                                         const bool verbose = false) {
-  return hpp_getoffsets_noid(fname, obj_count, display_progress, verbose);
+  return hpp_getoffsets_noid(fname, obj_count, display_progress, pb, verbose);
 }
 
 //' @title IFD Tags Extraction
@@ -312,9 +343,9 @@ Rcpp::IntegerVector cpp_getoffsets_noid(const std::string fname,
 //' @description
 //' Returns TAGS contained within an IFD (Image Field Directory) entry.
 //' @param fname string, path to file.
-//' @param offset uint32_t, position of the IFD beginning.
+//' @param offset std::size_t, position of the IFD beginning.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is 'false'.
-//' @param trunc_bytes uint32_t maximal number of individual scalar to extract BYTE/ASCII/SBYTE/UNDIFINED for TAGS (1, 2, 6 or 7). Default is 12.\cr
+//' @param trunc_bytes uint32_t maximal number of individual scalar to extract BYTE/ASCII/SBYTE/UNDEFINED for TAGS (1, 2, 6 or 7). Default is 12.\cr
 //' However, if less is found, less is returned in map.
 //' Note that, if 0 is provided, it will be automatically set to 1.
 //' @param force_trunc whether to force truncation for all TAGS types. Default is FALSE.\cr
@@ -322,9 +353,9 @@ Rcpp::IntegerVector cpp_getoffsets_noid(const std::string fname,
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List cpp_getTAGS (const std::string fname, 
-                        const uint32_t offset, 
+                        const std::size_t offset, 
                         const bool verbose = false, 
                         const uint8_t trunc_bytes = 12, 
                         const bool force_trunc = false) {
@@ -336,16 +367,16 @@ Rcpp::List cpp_getTAGS (const std::string fname,
 //' @description
 //' Returns TAGS contained within an IFD (Image Field Directory) entry.
 //' @param fname string, path to file.
-//' @param offset uint32_t, position of the IFD beginning.
-//' @param verbose bool, whether to display information (use for debugging purpose). Default is 'false'.
+//' @param offset std::size_t, position of the IFD beginning.
+//' @param swap bool, whether to swap bytes or not. Default is 'false'.
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List cpp_fastTAGS (const std::string fname, 
-                        const uint32_t offset, 
-                        const bool verbose = false) {
-  return hpp_fastTAGS (fname, offset, verbose); 
+                         const std::size_t offset, 
+                         const bool swap = false) {
+  return hpp_fastTAGS (fname, offset, swap); 
 }
 
 //' @title IFC_offsets Computation with Object Identification
@@ -356,17 +387,19 @@ Rcpp::List cpp_fastTAGS (const std::string fname,
 //' @param obj_count R_len_t, numbers of objects present in the file. Default is 0.
 //' If obj_count <= 0 then progress_bar is forced to false.
 //' @param display_progress bool, whether to display a progress bar. Default is false.
+//' @param pb a List of class `IFC_progress` containing a progress bar of class `txtProgressBar`, `winProgressBar` or `Progress`. Default is R_Nilvalue.
 //' @param verbose bool, whether to display information (use for debugging purpose). Default is false.
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
-//' @return a list of integer vectors with OBJECT_ID, TYPE and OFFSET of IFDs found.
+//' @return a list of numeric vectors with OBJECT_ID, TYPE and OFFSET of IFDs found.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
-Rcpp::List cpp_getoffsets_wid(const std::string fname, 
-                              const R_len_t obj_count = 0, 
-                              const bool display_progress = false, 
+// [[Rcpp::export(rng = false)]]
+Rcpp::List cpp_getoffsets_wid(const std::string fname,
+                              const R_len_t obj_count = 0,
+                              const bool display_progress = false,
+                              const Rcpp::Nullable<Rcpp::List> pb = R_NilValue,
                               const bool verbose = false) {
-  return hpp_getoffsets_wid(fname, obj_count, display_progress, verbose); 
+  return hpp_getoffsets_wid(fname, obj_count, display_progress, pb, verbose); 
 }
 
 //' @title Checksum for RIF/CIF
@@ -375,10 +408,9 @@ Rcpp::List cpp_getoffsets_wid(const std::string fname,
 //' Computes sum of img IFDs (Image Field Directory) offsets of objects 0, 1, 2, 3 and 4.
 //' @param fname string, path to file.
 //' @source TIFF 6.0 specifications archived from web \url{https://web.archive.org/web/20211209104854/https://www.adobe.io/open/standards/TIFF.html}
-//' @return an integer vector with offsets of IFDs found.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 std::size_t cpp_checksum(const std::string fname) {
   return hpp_checksum(fname);
 }
@@ -399,7 +431,7 @@ std::size_t cpp_checksum(const std::string fname) {
 //' - 3rd Dim is RGB
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector cpp_M_HSV2RGB (const Rcpp::NumericMatrix mat,
                                    const double h = 0.0,
                                    const double s = 0.0) {
@@ -420,7 +452,7 @@ Rcpp::NumericVector cpp_M_HSV2RGB (const Rcpp::NumericMatrix mat,
 //' @param lin_comp double, value that is used to smooth transition between Lin/Log.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector cpp_smoothLinLog (const Rcpp::NumericVector x,
                                       const double hyper = 1000.0,
                                       const double base = 10.0,
@@ -440,7 +472,7 @@ Rcpp::NumericVector cpp_smoothLinLog (const Rcpp::NumericVector x,
 //' @param lin_comp double, value that is used to smooth transition between Lin/Log.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector cpp_inv_smoothLinLog (const Rcpp::NumericVector x,
                                           const double hyper = 1000.0,
                                           const double base = 10.0,
@@ -455,7 +487,7 @@ Rcpp::NumericVector cpp_inv_smoothLinLog (const Rcpp::NumericVector x,
 //' @param x uint32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::RawVector cpp_uint32_to_raw (const uint32_t x) {
   return hpp_uint32_to_raw (x);
 }
@@ -467,9 +499,35 @@ Rcpp::RawVector cpp_uint32_to_raw (const uint32_t x) {
 //' @param x int32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 uint32_t cpp_int32_to_uint32 (const int32_t x) {
   return hpp_int32_to_uint32 (x);
+}
+
+//' @title Offset to Raw Conversion
+//' @name cpp_offset_to_raw
+//' @description
+//' Converts offset to raw
+//' @param x double.
+//' @param swap bool, whether to swap or not.
+//' @keywords internal
+////' @export
+// [[Rcpp::export(rng = false)]]
+Rcpp::RawVector cpp_offset_to_raw (const double x, const bool swap = false) {
+  return hpp_offset_to_raw(x, swap);
+}
+
+//' @title Offset to Raw Conversion
+//' @name cpp_raw_to_offset
+//' @description
+//' Converts raw to offset
+//' @param x RawVector.
+//' @param swap bool, whether to swap or not.
+//' @keywords internal
+////' @export
+// [[Rcpp::export]]
+double cpp_raw_to_offset (const Rcpp::RawVector x, const bool swap = false) {
+  return hpp_raw_to_offset(x, swap);
 }
 
 //' @title Uint32 to Int32 32bits Conversion
@@ -479,7 +537,7 @@ uint32_t cpp_int32_to_uint32 (const int32_t x) {
 //' @param x uint32_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 int32_t cpp_uint32_to_int32 (const uint32_t x) {
   return hpp_uint32_to_int32 (x);
 }
@@ -491,7 +549,7 @@ int32_t cpp_uint32_to_int32 (const uint32_t x) {
 //' @param x int64_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 uint64_t cpp_int64_to_uint64 (const int64_t x) {
   return hpp_int64_to_uint64 (x);
 }
@@ -503,7 +561,7 @@ uint64_t cpp_int64_to_uint64 (const int64_t x) {
 //' @param x uint64_t.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 int64_t cpp_uint64_to_int64 (const uint64_t x) {
   return hpp_uint64_to_int64 (x);
 }
@@ -515,7 +573,7 @@ int64_t cpp_uint64_to_int64 (const uint64_t x) {
 //' @param V a NumericVector
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int32_to_uint32 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
   return hpp_v_int32_to_uint32(V);
 }
@@ -527,7 +585,7 @@ Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int32_to_uint32 (Rcpp::Nullable<Rcpp::
 //' @param V a NumericVector
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int64_to_uint64 (Rcpp::Nullable<Rcpp::NumericVector> V = R_NilValue) {
   return hpp_v_int64_to_uint64(V);
 }
@@ -551,7 +609,7 @@ Rcpp::Nullable<Rcpp::NumericVector> cpp_v_int64_to_uint64 (Rcpp::Nullable<Rcpp::
 //' @return size_t index of first target character found within target plus 1 or 0 if not found.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 std::size_t cpp_scanFirst(const std::string fname, 
                           const Rcpp::RawVector raw, 
                           const std::size_t start = 0, 
@@ -578,7 +636,7 @@ std::size_t cpp_scanFirst(const std::string fname,
 //' and "lvs" the total number of unique values found (including NA).
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 SEXP cpp_fast_factor( SEXP x, 
                       const bool handleNA = true) {
   return hpp_fast_factor(x, handleNA);
@@ -592,7 +650,7 @@ SEXP cpp_fast_factor( SEXP x,
 //' @return an IntegerVector with the resulting global grouping factor and a "table" attribute representing the amount of scalar in each resulting level.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerVector cpp_group_df(const Rcpp::DataFrame df) {
   return hpp_group_df(df);
 }
@@ -608,7 +666,7 @@ Rcpp::IntegerVector cpp_group_df(const Rcpp::DataFrame df) {
 //' @return a 2 columns IntegerMatrix of x and y pixels coordinates.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerMatrix cpp_coord_to_px (const Rcpp::NumericVector x,
                                      const Rcpp::NumericVector y,
                                      const Rcpp::NumericVector param) {
@@ -622,7 +680,7 @@ Rcpp::IntegerMatrix cpp_coord_to_px (const Rcpp::NumericVector x,
 //' @return a nativeRaster IntegerMatrix
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerMatrix cpp_as_nativeRaster(const Rcpp::IntegerVector x) {
   return hpp_as_nativeRaster(x);
 }
@@ -647,7 +705,7 @@ Rcpp::IntegerMatrix cpp_as_nativeRaster(const Rcpp::IntegerVector x) {
 //' @keywords internal
 //' @return /!\ nothing is returned but img is modified in-place
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerVector cpp_draw (const Rcpp::IntegerVector img,
                               const Rcpp::IntegerMatrix coords = Rcpp::IntegerMatrix(1,2),
                               const Rcpp::LogicalMatrix mask = Rcpp::LogicalMatrix(1),
@@ -684,7 +742,7 @@ Rcpp::IntegerVector cpp_draw (const Rcpp::IntegerVector img,
 //' @return an IntegerVector with dimensions [height, width, 4]
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerVector cpp_raster (const uint16_t width,
                                 const uint16_t height,
                                 const Rcpp::List obj,
@@ -692,111 +750,6 @@ Rcpp::IntegerVector cpp_raster (const uint16_t width,
   return hpp_raster(width, height, obj, bg_);
 }
 // END plot
-
-// FROM cbind
-
-//' @title Fast Dataframe and Matrix Column Binding
-//' @name cpp_fast_cbind_DF_M
-//' @description
-//' Combines data.frame and matrix by columns
-//' @param Df_ a Nullable DataFrame.
-//' @param M_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a DataFrame.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_M(const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
-                                                    const Rcpp::Nullable<Rcpp::NumericVector> M_ = R_NilValue,
-                                                    const bool add_id = false) {
-  return hpp_fast_cbind_DF_M(Df_, M_, add_id);
-}
-
-//' @title Fast Matrix and Dataframe Column Binding
-//' @name cpp_fast_cbind_M_DF
-//' @description
-//' Combines matrix and data.frame by columns
-//' @param M_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
-//' @param Df_ a Nullable DataFrame.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a DataFrame.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_M_DF(const Rcpp::Nullable<Rcpp::NumericVector> M_ = R_NilValue,
-                                                    const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
-                                                    const bool add_id = false) {
-  return hpp_fast_cbind_M_DF(M_, Df_, add_id);
-}
-
-//' @title Dataframe and Dataframe Column Binding
-//' @name cpp_fast_cbind_DF_DF
-//' @description
-//' Combines numeric matrix by columns
-//' @param Df1_ a Nullable DataFrame.
-//' @param Df2_ a Nullable DataFrame.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a DataFrame.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_DF(const Rcpp::Nullable<Rcpp::DataFrame> Df1_ = R_NilValue,
-                                                     const Rcpp::Nullable<Rcpp::DataFrame> Df2_ = R_NilValue,
-                                                     const bool add_id = false) {
-  return hpp_fast_cbind_DF_DF(Df1_, Df2_, add_id);
-}
-
-//' @title Matrix and Matrix Column Binding
-//' @name cpp_fast_cbind_M_M
-//' @description
-//' Combines numeric matrix by columns
-//' @param M1_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
-//' @param M2_ a Nullable NumericVector. /!\ But cast to NumericMatrix.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a NumericVector.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::NumericVector> cpp_fast_cbind_M_M(const Rcpp::Nullable<Rcpp::NumericVector> M1_ = R_NilValue,
-                                                       const Rcpp::Nullable<Rcpp::NumericVector> M2_ = R_NilValue,
-                                                       const bool add_id = false) {
-  return hpp_fast_cbind_M_M(M1_, M2_, add_id);
-}
-
-//' @title Fast Dataframe and List Column Binding
-//' @name cpp_fast_cbind_DF_L
-//' @description
-//' Combines data.frame and list by columns
-//' @param Df_ a Nullable DataFrame.
-//' @param L_ a Nullable List.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a DataFrame.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_DF_L(const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
-                                                    const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue,
-                                                    const bool add_id = false) {
-  return hpp_fast_cbind_DF_L(Df_, L_, add_id);
-}
-
-//' @title Fast List and Dataframe Column Binding
-//' @name cpp_fast_cbind_L_DF
-//' @description
-//' Combines list and data.frame by columns
-//' @param L_ a Nullable List.
-//' @param Df_ a Nullable DataFrame.
-//' @param add_id a bool determining if 1st column of returned object should be given 1 to nrow integers
-//' @return a DataFrame.
-//' @keywords internal
-////' @export
-// [[Rcpp::export]]
-Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_L_DF(const Rcpp::Nullable<Rcpp::List> L_ = R_NilValue,
-                                                    const Rcpp::Nullable<Rcpp::DataFrame> Df_ = R_NilValue,
-                                                    const bool add_id = false) {
-  return hpp_fast_cbind_L_Df(L_, Df_, add_id);
-}
-// END cbind
 
 // FROM resize
 //' @title Matrix Cropping
@@ -809,7 +762,7 @@ Rcpp::Nullable<Rcpp::DataFrame> cpp_fast_cbind_L_DF(const Rcpp::Nullable<Rcpp::L
 //' @return a cropped matrix.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix cpp_crop (Rcpp::NumericMatrix mat,
                               const R_len_t new_height = 0,
                               const R_len_t new_width = 0) {
@@ -846,7 +799,7 @@ Rcpp::NumericMatrix cpp_resize (const Rcpp::NumericMatrix mat,
 //' @description
 //' Operates decompression of compressed image stored in TIFF file.
 //' @param fname string, path to file.
-//' @param offset uint32_t, position of the beginning of compressed image.
+//' @param offset std::size_t, position of the beginning of compressed image.
 //' @param nbytes uint32_t, number of bytes of compressed image.
 //' @param imgWidth R_len_t, Width of the decompressed image. Default is 1.
 //' @param imgHeight R_len_t, Height of the decompressed image. Default is 1.
@@ -891,9 +844,9 @@ Rcpp::NumericMatrix cpp_resize (const Rcpp::NumericMatrix mat,
 //' cited in \url{https://linkinghub.elsevier.com/retrieve/pii/S1046-2023(16)30291-2}
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List cpp_decomp (const std::string fname, 
-                       const uint32_t offset, 
+                       const std::size_t offset, 
                        const uint32_t nbytes, 
                        const uint32_t imgWidth = 1, 
                        const uint32_t imgHeight = 1, 
@@ -909,7 +862,7 @@ Rcpp::List cpp_decomp (const std::string fname,
 //' @description
 //' Operates decompression to raw of compressed image stored in TIFF file.
 //' @param fname string, path to file.
-//' @param offset uint32_t, position of the beginning of compressed image.
+//' @param offset std::size_t, position of the beginning of compressed image.
 //' @param nbytes uint32_t, number of bytes of compressed image.
 //' @param imgWidth uint32_t, Width of the decompressed image. Default is 1.
 //' @param imgHeight uint32_t, Height of the decompressed image. Default is 1.
@@ -949,9 +902,9 @@ Rcpp::List cpp_decomp (const std::string fname,
 //' cited in \url{https://linkinghub.elsevier.com/retrieve/pii/S1046-2023(16)30291-2}
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::RawVector cpp_rawdecomp (const std::string fname, 
-                               const uint32_t offset, 
+                               const std::size_t offset, 
                                const uint32_t nbytes, 
                                const uint32_t imgWidth = 1, 
                                const uint32_t imgHeight = 1, 
@@ -978,7 +931,7 @@ Rcpp::RawVector cpp_rawdecomp (const std::string fname,
 //' @param gamma correction. Default is 1, for no correction.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix cpp_normalize (const Rcpp::NumericMatrix mat, 
                                    const Rcpp::NumericVector input_range = Rcpp::NumericVector::create(0.0,4095.0),
                                    const bool full_range = false,
@@ -1019,7 +972,7 @@ Rcpp::NumericMatrix cpp_cleanse (const Rcpp::NumericMatrix mat,
 //' @param mask a NumericMatrix.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix cpp_mask (const Rcpp::NumericMatrix A,
                               const Rcpp::NumericMatrix B,
                               const Rcpp::NumericMatrix mask) {
@@ -1040,7 +993,7 @@ Rcpp::NumericMatrix cpp_mask (const Rcpp::NumericMatrix A,
 //' When true, values of 1-B are written into A when mask is not 0.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericMatrix cpp_mark (const Rcpp::NumericMatrix A,
                               const Rcpp::NumericMatrix B,
                               const Rcpp::NumericMatrix mask,
@@ -1073,7 +1026,7 @@ Rcpp::NumericMatrix cpp_mark (const Rcpp::NumericMatrix A,
 //' @param gamma correction. Default is 1, for no correction.
 //' @param spatialX X offset correction. Default is 0.0 for no change.
 //' @param spatialY Y offset correction. Default is 0.0 for no change.
-//' @details When add_noise is false, backgound will be automatically set to minimal pixel value for "masked" and "MC" removal method.\cr
+//' @details When add_noise is false, background will be automatically set to minimal pixel value for "masked" and "MC" removal method.\cr
 //' when a mask is detected, add_noise, full_range and force_range are set to false, background mean and sd to 0, and input_range to [0,3].\cr
 //' @keywords internal
 ////' @export

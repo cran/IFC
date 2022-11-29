@@ -35,7 +35,7 @@
 #' Users are highly encouraged to read TIFF specifications to have a better understanding about what IFDs are.
 #' @param fileName path to file.
 #' @param offsets either "all", "first" or an object of class `IFC_offset`. Default is "first".
-#' @param trunc_bytes a positive integer maximal number of individual scalar to extract BYTE/ASCII/SBYTE/UNDIFINED for TAGS (1, 2, 6 or 7). Default is 12.\cr
+#' @param trunc_bytes a positive integer maximal number of individual scalar to extract BYTE/ASCII/SBYTE/UNDEFINED for TAGS (1, 2, 6 or 7). Default is 12.\cr
 #' However, if less is found, less is returned in map. 
 #' Note that, if 0 is provided, it will be automatically set to 1.
 #' @param force_trunc whether to force truncation for all TAGS types. Default is FALSE.\cr
@@ -124,7 +124,7 @@ getIFD <- function(fileName, offsets = "first", trunc_bytes = 12, force_trunc = 
     if((length(obj_number) == 1) && (L == obj_number*2)) K = c("IFC_ifd_list", "IFC_full_ifd")
     VER = ifelse(verbose & (verbosity==2), TRUE, FALSE)
     if(display_progress) { 
-      pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+      pb = newPB(min = 0, max = L, initial = 0, style = 3)
       on.exit(endPB(pb), add = TRUE)
       ans = lapply(1:L, FUN=function(i_off) {
         setPB(pb, value = i_off, title = title_progress, label = "extracting IFDs")

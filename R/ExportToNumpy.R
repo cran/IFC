@@ -284,7 +284,7 @@ ExportToNumpy <- function(...,
   }
   tryCatch({
     if(display_progress) {
-      pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+      pb = newPB(min = 0, max = L, initial = 0, style = 3)
       ans = lapply(1:L, FUN = function(i) {
         setPB(pb, value = i, title = title_progress, label = "exporting objects to numpy")
         do.call(what = "objectExtract", args = c(list(ifd = lapply(sel[[i]],
@@ -330,7 +330,7 @@ ExportToNumpy <- function(...,
   if(image_type == "img") { 
     ids = sapply(ans, attr, which = "object_id")
   } else {
-    ids = as.integer(gsub("^.*_(.*)$", "\\1", sapply(ans, attr, which = "offset_id")))
+    ids = as.integer(gsub("msk_", "", gsub("img_", "", sapply(ans, attr, which = "offset_id"), fixed = TRUE), fixed = TRUE))
   }
   if(!all(objects == ids)) warning("Extracted object_ids differ from expected ones. Concider running with 'fast' = FALSE", call. = FALSE, immediate. = TRUE)
   

@@ -156,7 +156,7 @@ ExtractMasks_toMatrix <- function(...,
     return(NULL)
   }
   if(display_progress) {
-    pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+    pb = newPB(min = 0, max = L, initial = 0, style = 3)
     on.exit(endPB(pb))
     ans = lapply(1:L, FUN=function(i) {
       setPB(pb, value = i, title = title_progress, label = "exporting masks to matrix")
@@ -191,7 +191,7 @@ ExtractMasks_toMatrix <- function(...,
   } else {
     ans = ans[[1]]
   }
-  ids = as.integer(gsub("^.*_(.*)$", "\\1", sapply(ans, attr, which="offset_id")))
+  ids = as.integer(gsub("msk_", "", gsub("img_", "", sapply(ans, attr, which = "offset_id"), fixed = TRUE), fixed = TRUE))
   if(length(ids) != 0) if(!all(objects == ids)) warning("Extracted object_ids differ from expected ones. Concider running with 'fast' = FALSE", call. = FALSE, immediate. = TRUE)
   names(ans) = num_to_string(objects)
   attr(ans, "channel_id") <- channel_id

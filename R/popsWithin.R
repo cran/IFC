@@ -48,6 +48,9 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
   assert(pops, cla = c("IFC_pops","Affiliated","Ordered"))
   assert(regions, cla = "IFC_regions")
   assert(features, cla = "IFC_features")
+  if(anyDuplicated(names(pops))) stop("found populations with duplicated names")
+  if(anyDuplicated(names(regions))) stop("found regions with duplicated names")
+  if(anyDuplicated(names(features))) stop("found features with duplicated names")
   pnt_in_poly_algorithm = as.integer(pnt_in_poly_algorithm); assert(pnt_in_poly_algorithm, len = 1, alw = 1)
   pnt_in_poly_epsilon = as.numeric(pnt_in_poly_epsilon); pnt_in_poly_epsilon = pnt_in_poly_epsilon[pnt_in_poly_epsilon>0]; pnt_in_poly_epsilon = pnt_in_poly_epsilon[is.finite(pnt_in_poly_epsilon)]
   assert(pnt_in_poly_epsilon, len = 1, typ = "numeric")
@@ -60,9 +63,8 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
   alw_fun = sapply(c("&","|","!","("), USE.NAMES = TRUE, simplify = FALSE,
                    FUN = function(x) getFromNamespace(x, asNamespace("base")))
   obj_number = nrow(features)
-  
   if(display_progress) {
-    pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+    pb = newPB(min = 0, max = L, initial = 0, style = 3)
     on.exit(endPB(pb))
   }
   for(i in 1:L) {
@@ -74,6 +76,7 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
     # changes colors to R compatible
     pops[[i]]$color = map_color(pops[[i]]$color)
     pops[[i]]$lightModeColor = map_color(pops[[i]]$lightModeColor)
+    if(pop$base == pop$name) stop(pop$name, ", trying to compute a population with recursive 'base' reference")
     switch(pop$type,
            "B" = { 
              pops[[i]]$obj=rep(TRUE,obj_number)
@@ -114,12 +117,12 @@ popsWithin <- function(pops, regions, features, pnt_in_poly_algorithm = 1, pnt_i
              }
            }, 
            "C" = {
+             if(any(pop$name %in% pop$names)) stop(pop$name, ", trying to compute a boolean population with recursive \'definition\' ['",pop$definition,"']")
              pop_def_tmp=pop$split
              pop_def_tmp[pop_def_tmp=="And"] <- "&"
              pop_def_tmp[pop_def_tmp=="Or"] <- "|"
              pop_def_tmp[pop_def_tmp=="Not"] <- "!"
-             replace_with=c()
-             for(i_def in seq_along(pop$names)) replace_with=c(replace_with,random_name(n=10,special=NULL,forbidden=c(replace_with,pop_def_tmp)))
+             replace_with=gen_altnames(pop$names,forbidden=c(pop_def_tmp))
              for(i_def in seq_along(pop$names)) pop_def_tmp[pop$names[i_def] == pop_def_tmp] <- rep(paste0("`",replace_with[i_def],"`"), sum(pop$names[i_def] == pop_def_tmp))
              e = lapply(pops[pop$names], FUN=function(i_pop) i_pop$obj)
              names(e) = replace_with

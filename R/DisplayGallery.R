@@ -241,7 +241,13 @@ DisplayGallery <- function(...,
     }
   }
   extract_max = as.integer(min(extract_max, length(objects)))
-  if(sampling) {objects=sample(objects,extract_max)} else {objects=objects[1:extract_max]}
+  if(sampling) {
+    SEED = param$random_seed
+    if(!is.list(SEED)) SEED = do.call(fetch_seed, list(seed = SEED))
+    with_seed({objects=sample(objects,extract_max)}, SEED$seed, SEED$kind, SEED$normal.kind, SEED$sample.kind)
+  } else {
+    objects=objects[1:extract_max]
+  }
   if(length(objects)!=1) if(param$size[2] == 0) stop("'size' width should be provided when 'object' length not equal to one")
   
   # extract objects
@@ -254,7 +260,7 @@ DisplayGallery <- function(...,
   }
   tryCatch({
     if(display_progress) {
-      pb = newPB(session = dots$session, min = 0, max = L, initial = 0, style = 3)
+      pb = newPB(min = 0, max = L, initial = 0, style = 3)
       ans = lapply(1:L, FUN=function(i) {
         setPB(pb, value = i, title = title_progress, label = "exporting objects")
         do.call(what = "objectExtract", args = c(list(ifd = lapply(sel[[i]],
@@ -317,7 +323,7 @@ DisplayGallery <- function(...,
       txt_col = 1
     }
   } else {
-    dat = cbind(ids = as.integer(gsub("^.*_(.*)$", "\\1", sapply(ans, attr, which="offset_id"))), 
+    dat = cbind(ids = as.integer(gsub("msk_", "", gsub("img_", "", sapply(ans, attr, which = "offset_id"), fixed = TRUE), fixed = TRUE)), 
                 do.call(what = "rbind", args = lapply(ans, FUN=function(i) i[layout])))
     txt_col = 1
   }

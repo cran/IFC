@@ -174,23 +174,21 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
   }
   images = data.frame()
   ##### extracts images
+  swap = endianness != .Platform$endian
   if(extract_images) {
     if(is_binary) {
       seek(toread, toskip + feat_number*(obj_number*8 + 4) + 15)
       SO_number=cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness)) # number of SO
       if(SO_number != obj_number) stop("mismatch between expected object count and images numbers stored")
       if(display_progress) {
-        pb_im = newPB(session = dots$session, min = 0, max = SO_number, initial = 0, style = 3)
+        pb_im = newPB(min = 0, max = SO_number, initial = 0, style = 3)
         tryCatch({
         images=lapply(1:SO_number, FUN=function(i_image) {
           setPB(pb_im, value = i_image, title = title_progress, label = "extracting images values (binary)")
           id = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          imgIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used, img offsets are uint32
-          mskIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used, msk offsets are uint32
-          spIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used ?
+          imgIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
+          mskIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
+          spIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
           w = readBin(toread, "double", size = 8, n = 1, endian = endianness)
           l = readBin(toread, "double", size = 8, n = 1, endian = endianness)
           fs = readBin(toread, "double", size = 8, n = 1, endian = endianness)
@@ -219,12 +217,9 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       } else{
         images=lapply(1:SO_number, FUN=function(i_image) {
           id = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          imgIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used img offsets are uint32
-          mskIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used msk offsets are uint32
-          spIFD = cpp_int32_to_uint32(readBin(toread, "integer", size = 4, n = 1, endian = endianness))
-          readBin(toread, "raw", size = 1, n = 4, endian = endianness) # not used ?
+          imgIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
+          mskIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
+          spIFD = cpp_raw_to_offset(readBin(toread, "raw", n = 8), swap)
           w = readBin(toread, "double", size = 8, n = 1, endian = endianness)
           l = readBin(toread, "double", size = 8, n = 1, endian = endianness)
           fs = readBin(toread, "double", size = 8, n = 1, endian = endianness)
@@ -278,7 +273,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     ##### extracts offsets from images in DAF
     if(extract_offsets) {
       if(nrow(images) > 0) {
-        offsets = as.integer(unlist(lapply(1:nrow(images), FUN=function(i) {
+        offsets = as.numeric(unlist(lapply(1:nrow(images), FUN=function(i) {
           c(images$imgIFD[i], images$mskIFD[i])
         }))) 
       } 
@@ -310,7 +305,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     if(is_binary) {
       seek(toread, toskip+15)
       if(display_progress) {
-        pb_fe = newPB(session = dots$session, min = 0, max = feat_number, initial = 0, style = 3)
+        pb_fe = newPB(min = 0, max = feat_number, initial = 0, style = 3)
         tryCatch({
         features=lapply(1:feat_number, FUN=function(i_feat) {
           setPB(pb_fe, value = i_feat, title = title_progress, label = "extracting features values (binary)")
@@ -339,7 +334,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
       features=xml_attr(xml_find_all(tmp, "//UDFValues"), attr = "fv")
       feat_number=length(features)
       if(display_progress) {
-        pb_fe = newPB(session = dots$session, min = 0, max = feat_number, initial = 0, style = 3)
+        pb_fe = newPB(min = 0, max = feat_number, initial = 0, style = 3)
         tryCatch({
         features=lapply(1:feat_number,FUN=function(i_feat) {
           setPB(pb_fe, value = i_feat, title = title_progress, label = "extracting features values (xml)")
@@ -464,7 +459,7 @@ ExtractFromDAF <- function(fileName, extract_features = TRUE, extract_images = T
     if(length(pops)>0) {
       names(pops)=lapply(pops, FUN=function(x) x$name)
       if(display_progress) {
-        pb_pops = newPB(session = dots$session, min = 0, max = length(pops), initial = 0, style = 3)
+        pb_pops = newPB(min = 0, max = length(pops), initial = 0, style = 3)
         tryCatch({
           pops_=lapply(1:length(pops), FUN=function(i_pop) {
             setPB(pb_pops, value = i_pop, title = title_progress, label = "extracting tagged population objects")

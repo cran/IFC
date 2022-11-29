@@ -53,7 +53,7 @@ using namespace Rcpp;
 //' @return size_t index of first target character found within target plus 1 or 0 if not found.
 //' @keywords internal
 ////' @export
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 std::size_t hpp_scanFirst(const std::string fname, 
                           const Rcpp::RawVector raw,
                           const std::size_t start = 0, 
@@ -72,7 +72,6 @@ std::size_t hpp_scanFirst(const std::string fname,
   
   std::ifstream fi(fname.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
   if (fi.is_open()) {
-    try {
       fi.seekg(0, std::ios::end);
       std::size_t filesize = fi.tellg(), end_at = 0, n = 0, pos = 0;
       bool keep_searching = true;
@@ -100,16 +99,7 @@ std::size_t hpp_scanFirst(const std::string fname,
         n = str.find(target);
         if(n != std::string::npos) keep_searching = false;
       }
-      fi.close();
       if(!keep_searching) return pos + n + 1;
-    }
-    catch(std::exception &ex) { 
-      fi.close();
-      forward_exception_to_r(ex);
-    }
-    catch(...) {
-      Rcpp::stop("cpp_scanFirst: c++ exception (unknown reason)");
-    }
   }
   else {
     Rcpp::stop("cpp_scanFirst: Unable to open file");
