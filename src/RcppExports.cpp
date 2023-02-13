@@ -136,7 +136,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // cpp_get_bytes_order
-Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order(const R_len_t obj, const Rcpp::Nullable<Rcpp::IntegerVector> byt_, const Rcpp::Nullable<Rcpp::IntegerVector> ord_, const bool rev);
+Rcpp::Nullable<Rcpp::NumericVector> cpp_get_bytes_order(const R_len_t obj, const Rcpp::Nullable<Rcpp::IntegerVector> byt_, const Rcpp::Nullable<Rcpp::IntegerVector> ord_, const bool rev);
 RcppExport SEXP _IFC_cpp_get_bytes_order(SEXP objSEXP, SEXP byt_SEXP, SEXP ord_SEXP, SEXP revSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -430,7 +430,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // cpp_coord_to_px
-Rcpp::IntegerMatrix cpp_coord_to_px(const Rcpp::NumericVector x, const Rcpp::NumericVector y, const Rcpp::NumericVector param);
+Rcpp::NumericMatrix cpp_coord_to_px(const Rcpp::NumericVector x, const Rcpp::NumericVector y, const Rcpp::NumericVector param);
 RcppExport SEXP _IFC_cpp_coord_to_px(SEXP xSEXP, SEXP ySEXP, SEXP paramSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

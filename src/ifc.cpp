@@ -239,7 +239,7 @@ Rcpp::IntegerVector cpp_fast_sample(const R_len_t n = 0,
 //' @keywords internal
 ////' @export
 // [[Rcpp::export(rng = false)]]
-Rcpp::Nullable<Rcpp::IntegerVector> cpp_get_bytes_order (const R_len_t obj = 0,
+Rcpp::Nullable<Rcpp::NumericVector> cpp_get_bytes_order (const R_len_t obj = 0,
                                                          const Rcpp::Nullable<Rcpp::IntegerVector> byt_ = R_NilValue,
                                                          const Rcpp::Nullable<Rcpp::IntegerVector> ord_ = R_NilValue,
                                                          const bool rev = false) {
@@ -663,11 +663,11 @@ Rcpp::IntegerVector cpp_group_df(const Rcpp::DataFrame df) {
 //' @param x NumericVector of x-coordinates of the points.
 //' @param y NumericVector of y-coordinates of the points.
 //' @param param NumericVector of parameters to scale raw points coordinates to pixels coordinates.
-//' @return a 2 columns IntegerMatrix of x and y pixels coordinates.
+//' @return a 2 columns NumericMatrix of x and y pixels coordinates.
 //' @keywords internal
 ////' @export
 // [[Rcpp::export(rng = false)]]
-Rcpp::IntegerMatrix cpp_coord_to_px (const Rcpp::NumericVector x,
+Rcpp::NumericMatrix cpp_coord_to_px (const Rcpp::NumericVector x,
                                      const Rcpp::NumericVector y,
                                      const Rcpp::NumericVector param) {
   return hpp_coord_to_px(x, y, param);

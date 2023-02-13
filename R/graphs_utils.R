@@ -60,14 +60,19 @@ calcDensity=getFromNamespace(x = ".smoothScatterCalcDensity", ns = "grDevices")
 #' @description Helper to map density to colors
 #' @source derived from \pkg{grDevices} R Core Team, Florian Hahne at FHCRC, originally
 #' @keywords internal
-densCols=function (x, y = NULL, nbin = 128, bandwidth, colramp = colorRampPalette(c("blue","green","red")), transformation="asinh") {
+densCols=function (x, y = NULL,
+                   xlim = range(x, na.rm = TRUE, finite = TRUE),
+                   ylim = range(y, na.rm = TRUE, finite = TRUE),
+                   nbin = 128, colramp = colorRampPalette(c("blue","green","red")), transformation = "asinh") {
   x_features = attr(x, "features")
   xy <- xy.coords(x, y)
-  select <- is.finite(xy$x) & is.finite(xy$y)
+  select <- is.finite(xy$x) & is.finite(xy$y) &
+    xy$x >= xlim[1] & xy$x <= xlim[2] &
+    xy$y >= ylim[1] & xy$y <= ylim[2]
   tr <- try(parseTrans(transformation), silent = TRUE)
   if(!inherits(tr, what = "try-error")) {
-    x <- cbind(xy$x, xy$y)[select, ]
-    map <- calcDensity(x, nbin, bandwidth)
+    x <- cbind(xy$x, xy$y)[select, , drop = FALSE]
+    map <- calcDensity(x, nbin)
     mkBreaks <- function(u) u - diff(cpp_fast_range(u))/(length(u) - 1)/2
     xbin <- cut(x[, 1], mkBreaks(map$x1), labels = FALSE)
     ybin <- cut(x[, 2], mkBreaks(map$x2), labels = FALSE)
@@ -424,10 +429,10 @@ get_coordmap_adjusted=function(coordmap,
                                height = grDevices::dev.size("px")[2],
                                ratio = graphics::par('din') / graphics::par('pin')) {
   if(missing(coordmap)) coordmap = get_coordmap_raw()
-  range = list(left = coordmap$range$left * (width - 1) * ratio[1],
-               right = coordmap$range$right * (width - 1) * ratio[1],
-               bottom = (1 - coordmap$range$bottom) * (height - 1) * ratio[2],
-               top = (1 - coordmap$range$top) * (height - 1) * ratio[2])
+  range = list(left = coordmap$range$left * width * ratio[1],
+               right = coordmap$range$right * width * ratio[1],
+               bottom = (1 - coordmap$range$bottom) * height * ratio[2],
+               top = (1 - coordmap$range$top) * height * ratio[2])
   return(list(domain=coordmap$domain, range=range, width = width, height = height, ratio=list(x=ratio[1],y=ratio[2])))
 }
 
@@ -436,10 +441,10 @@ get_coordmap_adjusted=function(coordmap,
 #' @description Helper map user's coordinates to pixels
 #' @param coord coordinates in user system. A matrix where rows are points and with at least 2 columns named "x" and "y" for x and y coordinates, respectively.
 #' @param coordmap current device adjusted coordinates. Default is missing.
-#' @param clipedge whether to clip points outside of plotting region to the edge. Default is FALSE.
+#' @param pntsonedge whether points outside of plotting region should be bounded on the edge. Default is FALSE to clip points.
 #' @return a 2-columns matrix with "x" and "y" coordinates.
 #' @keywords internal
-coord_to_px=function (coord, coordmap, clipedge = FALSE) {
+coord_to_px=function (coord, coordmap, pntsonedge = FALSE) {
   if(missing(coordmap)) coordmap = get_coordmap_adjusted()
   ran_x = range(coordmap$domain$left, coordmap$domain$right)
   dx = coordmap$domain$right - coordmap$domain$left
@@ -459,11 +464,7 @@ coord_to_px=function (coord, coordmap, clipedge = FALSE) {
                             img_h_2 = ran_img_height[2],
                             ratio_x = coordmap$ratio$x,
                             ratio_y = coordmap$ratio$y,
-                            edge = clipedge))
-  # return(cbind(x = ((coord$x - coordmap$domain$left)/dx * width + ran_img_width[1])     /coordmap$ratio$x,
-  #              y = (ran_img_height[2] - (coord$y - coordmap$domain$bottom)/dy * height) /coordmap$ratio$y, 
-  #              draw = (coord$x <= ran_x[2]) & (coord$x >= ran_x[1]) & 
-  #                (coord$y <= ran_y[2]) & (coord$y >= ran_y[1])))
+                            edge = pntsonedge))
 }
 
 #' @title `IFC_plot` Conversion to 'base' Plot
@@ -473,7 +474,10 @@ coord_to_px=function (coord, coordmap, clipedge = FALSE) {
 #' @keywords internal
 plot_base=function(obj) {
   old_mar = par("mar")
-  on.exit(par("mar" = old_mar), add = TRUE)
+  on.exit(par("mar" = old_mar))
+  old_axs = par("xaxs","yaxs")
+  on.exit(par(old_axs), add = TRUE)
+  par(xaxs = "i", yaxs = "i")
   old_colormode = par("bg","fg","col","col.axis","col.lab","col.main","col.sub")
   on.exit(par(old_colormode), add = TRUE)
   color_mode = na.omit(as.integer(obj$input$mode))
@@ -559,6 +563,8 @@ plot_base=function(obj) {
       if((length(args_level) != 0) && (args_level != "") && hasdata) {
         col = densCols(x = structure(obj$input$data$x2[obj$input$subset], features=attr(obj$input$data,"features")),
                        y = obj$input$data$y2[obj$input$subset],
+                       xlim = Xlim,
+                       ylim = Ylim,
                        colramp=colramp,
                        nbin=obj$input$bin,
                        transformation="return")
@@ -597,6 +603,8 @@ plot_base=function(obj) {
       } else {
         if(hasdata) col = densCols(x = structure(obj$input$data$x2[obj$input$subset], features=attr(obj$input$data,"features")),
                                    y = obj$input$data$y2[obj$input$subset],
+                                   xlim = Xlim,
+                                   ylim = Ylim,
                                    colramp = colramp,
                                    nbin = obj$input$bin,
                                    transformation = obj$input$trans)
@@ -656,10 +664,10 @@ plot_base=function(obj) {
   x_ticks = base_axis_constr(lim = Xlim, trans = obj$input$trans_x, nint = n_ticks)
   y_ticks = base_axis_constr(lim = Ylim, trans = obj$input$trans_y, nint = n_ticks)
   x_axis = axis(side = 1, at = x_ticks$at, labels = FALSE)
-  text(x = x_axis, y = Ylim[1] - diff(Ylim) * 0.07, labels = x_ticks$labels, xpd=TRUE, adj = c(1, 1),
+  text(x = x_axis, y = Ylim[1], labels = x_ticks$labels, xpd=TRUE, adj = c(1, 1.5),
        cex = lt$axis.text$cex, cex.axis = lt$axis.text$cex, srt=45)
   y_axis = axis(side = 2, at = y_ticks$at, labels = FALSE)
-  text(y = y_axis, x = Xlim[1] - diff(Xlim) * 0.07, labels = y_ticks$labels, xpd=TRUE, adj = c(1, 0.5),
+  text(y = y_axis, x = Xlim[1], labels = y_ticks$labels, xpd=TRUE, pos = 2, offset = 0.5,
        cex = lt$axis.text$cex, cex.axis = lt$axis.text$cex, las=1)
   box(col = c("white", "black")[color_mode])
   
@@ -728,10 +736,15 @@ plot_base=function(obj) {
 #' @name plot_raster
 #' @description Helper to convert `IFC_plot` to 'raster' plot.
 #' @param obj an object of class `IFC_plot` as created by \code{\link{plotGraph}}.
+#' @param pntsonedge whether points outside of plotting region should be bounded on the edge. Default is FALSE to clip points.
+#' NA can be used to produce hybrid display, with plot being drawn with `pntsonedge` = FALSE on top of plot with `pntsonedge` = TRUE.
 #' @keywords internal
-plot_raster=function(obj) {
+plot_raster=function(obj, pntsonedge = FALSE) {
   old_mar = par("mar")
-  on.exit(par("mar" = old_mar), add = TRUE)
+  on.exit(par("mar" = old_mar))
+  old_axs = par("xaxs","yaxs")
+  on.exit(par(old_axs), add = TRUE)
+  par(xaxs = "i", yaxs = "i")
   old_colormode = par("bg","fg","col","col.axis","col.lab","col.main","col.sub")
   on.exit(par(old_colormode), add = TRUE)
   color_mode = na.omit(as.integer(obj$input$mode))
@@ -769,71 +782,82 @@ plot_raster=function(obj) {
     graph$input$title = ""
     graph$input$trans = ""
   }
-  if(inherits(x = try(parseTrans(obj$input$trans), silent = TRUE), what="try-error")) subtitle = TRUE
-
   # create empty plot
   plot_base(graph)
   
-  # determines current device plotting region
-  coordmap = get_coordmap_adjusted()
-  
+  if(inherits(x = try(parseTrans(obj$input$trans), silent = TRUE), what="try-error")) subtitle = TRUE
   # create data specific list for raster plot
   if((obj$input$precision == "light") && (length(disp_n) > 1)) {
     set = disp_n[apply(obj$input$data[,disp_n, drop = FALSE], 1, FUN = function(x) {
       foo = which(x)[1]
     })]
   }
-  data = sapply(rev(disp_n), simplify = FALSE, USE.NAMES = TRUE, FUN = function(p) {
-    if((obj$input$precision == "light") && (length(disp_n) > 1)) {
-      sub_ = obj$input$data[, p] & obj$input$subset & (set == p)
-    } else {
-      sub_ = obj$input$data[, p] & obj$input$subset
-    } 
-    if(sum(sub_) == 0) return(NULL)
-    coords = obj$input$data[, c("x2","y2")]
-    colnames(coords) = c("x","y")
-    if(obj$input$type == "scatter") {
-      size = 7
-      col = map_color(obj$input$displayed[[p]][c("color","lightModeColor")][[color_mode]])
-    } else {
-      size = 9
-      colramp = colorRampPalette(colConv(obj$input$base[[1]][c("densitycolorsdarkmode", "densitycolorslightmode")][[color_mode]]))
-      if((sum(sub_) < 20000) || inherits(try(suppressWarnings(formals(obj$input$trans)), silent = TRUE), "try-error")) {
-        col = densCols(x = structure(coords[sub_,"x"], features=attr(obj$input$data,"features")),
-                       y = coords[sub_,"y"],
-                       colramp = colramp,
-                       nbin = obj$input$bin,
-                       transformation = obj$input$trans)
+  coords = obj$input$data[, c("x2","y2")]
+  colnames(coords) = c("x","y")
+  is_hybrid = all(is.na(pntsonedge))
+  
+  # determines current device plotting region
+  coordmap = get_coordmap_adjusted()
+  draw_fn <- function(pntsonedge = pntsonedge, bg = NULL) {
+    data = sapply(rev(disp_n), simplify = FALSE, USE.NAMES = TRUE, FUN = function(p) {
+      if((obj$input$precision == "light") && (length(disp_n) > 1)) {
+        sub_ = obj$input$data[, p] & obj$input$subset & (set == p)
       } else {
-        col = colramp(255)
+        sub_ = obj$input$data[, p] & obj$input$subset
+      } 
+      if(sum(sub_) == 0) return(NULL)
+      if(obj$input$type == "scatter") {
+        size = 7
+        col = map_color(obj$input$displayed[[p]][c("color","lightModeColor")][[color_mode]])
+      } else {
+        size = 9
+        col = colorRampPalette(colConv(obj$input$base[[1]][c("densitycolorsdarkmode", "densitycolorslightmode")][[color_mode]]))(255)
       }
+      list(size = size,
+           pch = obj$input$displayed[[p]]$style,
+           col = rbind(col2rgb(col, alpha = FALSE), 255),
+           lwd = 1,
+           coords = coord_to_px(coord=coords[sub_,,drop=FALSE], coordmap=coordmap, pntsonedge=pntsonedge),
+           blur_size = 9,
+           blur_sd = 3)
+    })
+    data = data[sapply(data, length) != 0]
+    if(length(data) != 0) {
+      # call c part to produce image raster
+      img = cpp_raster(width = coordmap$width, height = coordmap$height, obj = data, bg_ = bg)
+      # subset img to drawing region
+      usr = unlist(recursive = FALSE, use.names = FALSE, coordmap$domain)
+      lims = round(c(coord_to_px(coord = data.frame(x = usr[1:2], y = usr[3:4]),
+                           coordmap = coordmap,
+                           pntsonedge = F)) + c(1,1,0,0))
+      # overlay everything but not edges
+      if(is_hybrid && (FALSE %in% pntsonedge)) {
+        brd = seq(0,4)
+        for(i in brd) { k = lims[1] + i; if(k >= 1 && k <= coordmap$width)  img[ ,k , ] <- bg[ ,k , ] }
+        for(i in brd) { k = lims[2] - i; if(k >= 1 && k <= coordmap$width)  img[ ,k , ] <- bg[ ,k , ] }
+        for(i in brd) { k = lims[3] - i; if(k >= 1 && k <= coordmap$height) img[k , , ] <- bg[k , , ] }
+        for(i in brd) { k = lims[4] + i; if(k >= 1 && k <= coordmap$height) img[k , , ] <- bg[k , , ] }
+      }
+      # add image to plot, rasterImage is faster than grid.raster and allows to fit bg when it is resized
+      if(!identical(get_coordmap_adjusted(), coordmap)) {
+        text(x = graphics::grconvertX(0.5, "npc", "user"),
+             y = graphics::grconvertY(0.5, "npc", "user"),
+             labels = "you should not modify graphic device while drawing raster",
+             col = "red")
+        img = NULL
+      } else {
+        rasterImage(cpp_as_nativeRaster(img[lims[3]:lims[4], lims[1]:lims[2],]),
+                    xleft = usr[1], xright = usr[2], ybottom = usr[4], ytop = usr[3], interpolate = TRUE)
+      }
+      # return img
+      return(img)
     }
-    list(size = size,
-         pch = obj$input$displayed[[p]]$style,
-         col = rbind(col2rgb(col, alpha = FALSE), 255),
-         lwd = 1,
-         coords = coord_to_px(coord=coords[sub_,,drop=FALSE], coordmap=coordmap),
-         blur_size = 9,
-         blur_sd = 3)
-  })
-  data = data[sapply(data, length) != 0]
-  if(length(data) != 0) {
-    zoom = 1
-    # image is zoom fold more the size of the device and then raster size is zoom fold less, this should allow anti-aliasing
-    # however this could lead to much more longer computation times
-    # call c part to produce image raster
-    img = cpp_raster(width = zoom * grDevices::dev.size("px")[1], height = zoom * grDevices::dev.size("px")[2], data)
-    usr = par("usr")
-    dv_size = grDevices::dev.size("px")
-    # subset img to drawing region
-    lims = round(c(graphics::grconvertX(usr[1], "user", "ndc") * (dv_size[1]),
-                   graphics::grconvertX(usr[2], "user", "ndc") * (dv_size[1]),
-                   (1 - graphics::grconvertY(usr[3], "user", "ndc")) * (dv_size[2]),
-                   (1 - graphics::grconvertY(usr[4], "user", "ndc")) * (dv_size[2])))
-    # add image to plot
-    rasterImage(cpp_as_nativeRaster(img[lims[3]:lims[4], lims[1]:lims[2],]),
-                xleft = usr[1], xright = usr[2], ybottom = usr[4], ytop = usr[3], interpolate = TRUE)
-    # rasterImage is faster than grid.raster and allows to fit bg when it is resized
+  }
+  if(is_hybrid) {
+    img = draw_fn(TRUE, bg = NULL)
+    img = draw_fn(FALSE, bg = img)
+  } else {
+    img = draw_fn(pntsonedge)
   }
   # redraw regions
   for(reg in obj$input$regions) {
@@ -1050,7 +1074,13 @@ plot_lattice=function(obj) {
                      colramp=colorRampPalette(colConv(basepop[[1]][c("densitycolorsdarkmode","densitycolorslightmode")][[color_mode]]))
                      args_level = basepop[[1]][["densitylevel"]]
                      if((length(args_level) != 0) && (args_level != "")) {
-                       col = densCols(x=structure(x, features=attr(obj$input$data,"features")), y=y, colramp=colramp, nbin=nbin, transformation="return")
+                       col = densCols(x=structure(x, features=attr(obj$input$data,"features")),
+                                      y=y,
+                                      xlim = Xlim,
+                                      ylim = Ylim,
+                                      colramp=colramp,
+                                      nbin=nbin,
+                                      transformation="return")
                        args_level=strsplit(args_level,split="|",fixed=TRUE)[[1]]
                        fill = args_level[1] == "true"
                        dolines = args_level[2] == "true"
@@ -1081,7 +1111,13 @@ plot_lattice=function(obj) {
                          lapply(1:length(lines), FUN = function(i_l) do.call(panel.lines, args = c(lines[i_l], list(col=contour_cols[lines[[i_l]]$level == at]))))
                        }
                      } else {
-                       col = densCols(x=structure(x, features=attr(obj$input$data,"features")), y=y, colramp=colramp, nbin=nbin, transformation=trans)
+                       col = densCols(x=structure(x, features=attr(obj$input$data,"features")),
+                                      y=y,
+                                      xlim = Xlim,
+                                      ylim = Ylim,
+                                      colramp=colramp,
+                                      nbin=nbin,
+                                      transformation=trans)
                        panel.xyplot(x=x,y=y,pch=".", col=col)
                      }
                    }
