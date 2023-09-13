@@ -237,6 +237,7 @@ base_axis_constr=function(lim, trans = "P", nint = 10) {
     neg_log_ticks = 0
     pos_log_ticks = 0
     # compute range without expansion in original scale
+    if(diff(lim) == 0) lim = c(-1,1)
     ran = diff(lim) / 1.14 * c(0.07, -0.07) + lim
     ran = applyTrans(ran, trans_, inverse = TRUE)
     n_ticks = max(ran[1], -hyper)
@@ -248,8 +249,9 @@ base_axis_constr=function(lim, trans = "P", nint = 10) {
     if(ran_[1] < 0) neg_log_ticks = floor(ran_[1])
     if(ran_[2] > 0) pos_log_ticks = ceiling(ran_[2])
     tot = pos_log_ticks - neg_log_ticks + 
-      ifelse((neg_log_ticks < 0) && (n_ticks >= -hyper), 0.5, 0) + 
-      ifelse((pos_log_ticks > 0) && (p_ticks <= hyper), 0.5, 0)
+      ifelse((neg_log_ticks <= 0) && (n_ticks >= -hyper), 0.5, 0) + 
+      ifelse((pos_log_ticks >= 0) && (p_ticks <= hyper), 0.5, 0)
+    if(tot <= 0) tot = 1
     # create ticks and labels
     ticks_at = c()
     ticks_lab = c()
@@ -475,6 +477,8 @@ coord_to_px=function (coord, coordmap, pntsonedge = FALSE) {
 plot_base=function(obj) {
   old_mar = par("mar")
   on.exit(par("mar" = old_mar))
+  old_ask = par("ask" = FALSE)
+  on.exit(par(old_ask), add = TRUE)
   old_axs = par("xaxs","yaxs")
   on.exit(par(old_axs), add = TRUE)
   par(xaxs = "i", yaxs = "i")
@@ -560,7 +564,7 @@ plot_base=function(obj) {
       col=c("black","white")[color_mode]
       colramp=colorRampPalette(colConv(basepop[[1]][c("densitycolorsdarkmode","densitycolorslightmode")][[color_mode]]))
       args_level = basepop[[1]][["densitylevel"]]
-      if((length(args_level) != 0) && (args_level != "") && hasdata) {
+      if((length(args_level) != 0) && !any(args_level == "") && hasdata) {
         col = densCols(x = structure(obj$input$data$x2[obj$input$subset], features=attr(obj$input$data,"features")),
                        y = obj$input$data$y2[obj$input$subset],
                        xlim = Xlim,
@@ -615,7 +619,7 @@ plot_base=function(obj) {
                          args_plot),
                 what = plot)
       }
-      if((length(args_level) == 0) || (args_level == ""))
+      if((length(args_level) == 0) || any(args_level == ""))
         if(inherits(x = try(parseTrans(obj$input$trans), silent = TRUE), what="try-error")) subtitle = TRUE
     } else {
       if(obj$input$precision == "full") {
@@ -742,6 +746,8 @@ plot_base=function(obj) {
 plot_raster=function(obj, pntsonedge = FALSE) {
   old_mar = par("mar")
   on.exit(par("mar" = old_mar))
+  old_ask = par("ask" = FALSE)
+  on.exit(par(old_ask), add = TRUE)
   old_axs = par("xaxs","yaxs")
   on.exit(par(old_axs), add = TRUE)
   par(xaxs = "i", yaxs = "i")
@@ -761,7 +767,7 @@ plot_raster=function(obj, pntsonedge = FALSE) {
   if(obj$input$type == "density") {
     basepop = obj$input$base
     args_level = basepop[[1]][["densitylevel"]]
-    if((length(args_level) != 0) && (args_level != "")) return(plot_base(obj))
+    if((length(args_level) != 0) && !any(args_level == "")) return(plot_base(obj))
   }
   lt = obj$input$par.settings
   
@@ -799,6 +805,13 @@ plot_raster=function(obj, pntsonedge = FALSE) {
   # determines current device plotting region
   coordmap = get_coordmap_adjusted()
   draw_fn <- function(pntsonedge = pntsonedge, bg = NULL) {
+    usr = unlist(recursive = FALSE, use.names = FALSE, coordmap$domain)
+    lims = round(c(coord_to_px(coord = data.frame(x = usr[1:2], y = usr[3:4]),
+                               coordmap = coordmap,
+                               pntsonedge = F)) + c(1,1,0,0))
+    bsize = round(max(abs(lims[2] - lims[1]), abs(lims[3] - lims[4])) / 17)
+    if(!(bsize %% 2)) bsize = bsize + 1
+    bsize = min(bsize, 95)
     data = sapply(rev(disp_n), simplify = FALSE, USE.NAMES = TRUE, FUN = function(p) {
       if((obj$input$precision == "light") && (length(disp_n) > 1)) {
         sub_ = obj$input$data[, p] & obj$input$subset & (set == p)
@@ -818,18 +831,13 @@ plot_raster=function(obj, pntsonedge = FALSE) {
            col = rbind(col2rgb(col, alpha = FALSE), 255),
            lwd = 1,
            coords = coord_to_px(coord=coords[sub_,,drop=FALSE], coordmap=coordmap, pntsonedge=pntsonedge),
-           blur_size = 9,
-           blur_sd = 3)
+           blur_size = bsize,
+           blur_sd = bsize / 6)
     })
     data = data[sapply(data, length) != 0]
     if(length(data) != 0) {
       # call c part to produce image raster
       img = cpp_raster(width = coordmap$width, height = coordmap$height, obj = data, bg_ = bg)
-      # subset img to drawing region
-      usr = unlist(recursive = FALSE, use.names = FALSE, coordmap$domain)
-      lims = round(c(coord_to_px(coord = data.frame(x = usr[1:2], y = usr[3:4]),
-                           coordmap = coordmap,
-                           pntsonedge = F)) + c(1,1,0,0))
       # overlay everything but not edges
       if(is_hybrid && (FALSE %in% pntsonedge)) {
         brd = seq(0,4)
@@ -920,6 +928,8 @@ plot_raster=function(obj, pntsonedge = FALSE) {
 #' @param obj an object of class `IFC_plot` as created by \code{\link{plotGraph}}.
 #' @keywords internal
 plot_lattice=function(obj) {
+  old_ask = par("ask" = FALSE)
+  on.exit(par(old_ask), add = TRUE)
   # check obj is `IFC_plot`
   assert(obj, cla = "IFC_plot")
   
@@ -1010,7 +1020,7 @@ plot_lattice=function(obj) {
                               })
                             }
                           })
-          foo = foo + as.layer(tmp, opposite = FALSE, axes = NULL)
+          foo = foo + latticeExtra::as.layer(tmp, opposite = FALSE, axes = NULL)
         }
       }
     } else {
@@ -1059,7 +1069,7 @@ plot_lattice=function(obj) {
     xtop = NULL
     if(type == "density") {
       args_level = basepop[[1]][["densitylevel"]]
-      if((length(args_level) == 0) || (args_level == ""))
+      if((length(args_level) == 0) || any(args_level == ""))
         if(inherits(x = try(parseTrans(trans), silent = TRUE), what="try-error")) xtop = trans
     }
     foo = xyplot(D[,"y2"] ~ D[,"x2"], auto.key=FALSE,
@@ -1073,7 +1083,7 @@ plot_lattice=function(obj) {
                    if(type == "density") {
                      colramp=colorRampPalette(colConv(basepop[[1]][c("densitycolorsdarkmode","densitycolorslightmode")][[color_mode]]))
                      args_level = basepop[[1]][["densitylevel"]]
-                     if((length(args_level) != 0) && (args_level != "")) {
+                     if((length(args_level) != 0) && !any(args_level == "")) {
                        col = densCols(x=structure(x, features=attr(obj$input$data,"features")),
                                       y=y,
                                       xlim = Xlim,
@@ -1155,7 +1165,7 @@ plot_lattice=function(obj) {
       disp = displayed_n[l]
       if(any(D[,disp])) { # adds layer only if there is at least one point
         tmp = xyplot(D[,"y2"] ~ D[,"x2"], pch = P[[disp]]$style, col = P[[disp]][c("color","lightModeColor")][[color_mode]], subset = D[,disp])
-        foo = foo + as.layer(tmp)
+        foo = foo + latticeExtra::as.layer(tmp)
       }
     }
   }
@@ -1367,6 +1377,12 @@ adjustGraph=function(obj, graph, adjust_graph=TRUE, ...) {
   if(inherits(x = g, what = "try-error")) return(list())
   
   # try to draw the graph
+  dv <- dev.list()
+  on.exit(suspendInterrupts({
+    while((length(dev.list()) != 0) && !identical(dv, dev.list())) {
+      dev.off(which = rev(dev.list())[1])
+    }
+  }), add = TRUE)
   drawable = try(plot_lattice(plotGraph(obj = obj, graph = g, draw = FALSE, stats_print = FALSE)), silent = TRUE)
   if(inherits(x = drawable, what = "try-error")) return(list())
   return(g)
